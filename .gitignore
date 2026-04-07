@@ -9,6 +9,10 @@
 kiro_specs/
 specs/
 
+.kiro/
+*.kiro
+kiro_specs/
+specs/
 # =========================
 
 # 🧠 ENV & SECRETS
