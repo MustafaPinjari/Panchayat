@@ -27,6 +27,10 @@ specs/
 secrets.json
 firebase-adminsdk.json
 
+Backend/.env.example
+Frontend/.env.example
+*serviceAccount*.json
+firebase-adminsdk*.json
 # =========================
 
 # ⚛️ FRONTEND (React)

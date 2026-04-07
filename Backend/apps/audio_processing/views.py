@@ -15,59 +15,30 @@ from rest_framework.views import APIView
 
 from services.storage_service import storage_service
 from services.whisper_service import whisper_service
+from .mixins import ValidateAudioFileMixin
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_MIME_TYPES = {
-    'audio/mpeg',
-    'audio/wav',
-    'audio/mp4',
-    'audio/webm',
-}
-MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024  # 25 MB
 
-
-class AudioUploadView(APIView):
+class AudioUploadView(ValidateAudioFileMixin, APIView):
     """
     POST /api/complaints/audio-upload/
 
     Accepts a multipart/form-data request with an `audio_file` field.
-    Validates MIME type and size, uploads to Firebase Storage, transcribes
-    with Whisper, and returns { "audio_url": "...", "transcript": "..." }.
+    Validates MIME type and size via ValidateAudioFileMixin, uploads to
+    Firebase Storage, transcribes with Whisper, and returns
+    { "audio_url": "...", "transcript": "..." }.
     """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        audio_file = request.FILES.get('audio_file')
+        # Delegate file validation to the mixin
+        error_response = self.validate_audio_file(request)
+        if error_response is not None:
+            return error_response
 
-        if audio_file is None:
-            return Response(
-                {'error': 'No audio file provided. Use the field name "audio_file".'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Validate MIME type
-        content_type = audio_file.content_type or ''
-        if content_type not in ALLOWED_MIME_TYPES:
-            return Response(
-                {
-                    'error': 'Unsupported audio format.',
-                    'detail': f'Supported formats: {", ".join(sorted(ALLOWED_MIME_TYPES))}',
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Validate file size
-        if audio_file.size > MAX_FILE_SIZE_BYTES:
-            return Response(
-                {
-                    'error': 'File too large.',
-                    'detail': 'Maximum allowed file size is 25 MB.',
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+        audio_file = request.FILES['audio_file']
         user_id = getattr(request.user, 'user_id', 'unknown')
         filename = audio_file.name or 'upload'
 
@@ -84,6 +55,7 @@ class AudioUploadView(APIView):
 
         # Write to a temp file for Whisper (needs a real file path)
         suffix = os.path.splitext(filename)[1] or '.tmp'
+        tmp_path = None
         try:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                 tmp_path = tmp.name
@@ -106,11 +78,11 @@ class AudioUploadView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         finally:
-            # Clean up temp file
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
 
         return Response(
             {'audio_url': audio_url, 'transcript': transcript},

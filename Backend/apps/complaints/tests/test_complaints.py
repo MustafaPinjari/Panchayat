@@ -375,3 +375,83 @@ class TestCommentListView:
         assert resp.status_code == 200
         timestamps = [c['created_at'] for c in resp.json()]
         assert timestamps == sorted(timestamps)
+
+
+# ---------------------------------------------------------------------------
+# AnalyticsView tests
+# ---------------------------------------------------------------------------
+
+class TestAnalyticsView:
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.client = APIClient()
+        self.admin_token = _make_jwt(str(uuid.uuid4()), 'admin')
+
+    @patch('apps.complaints.views.firestore_service')
+    def test_admin_gets_analytics(self, mock_fs):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.admin_token}')
+        mock_fs.query.return_value = [
+            _sample_complaint(category='water', status='pending'),
+            _sample_complaint(category='water', status='resolved'),
+            _sample_complaint(category='security', status='in_progress'),
+        ]
+
+        resp = self.client.get('/api/admin/analytics/')
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data['total'] == 3
+        assert data['by_status']['pending'] == 1
+        assert data['by_status']['resolved'] == 1
+        assert data['by_status']['in_progress'] == 1
+        assert data['by_category']['water'] == 2
+        assert data['by_category']['security'] == 1
+
+    @patch('apps.complaints.views.firestore_service')
+    def test_analytics_counts_sum_to_total(self, mock_fs):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.admin_token}')
+        mock_fs.query.return_value = [
+            _sample_complaint(category='water', status='pending'),
+            _sample_complaint(category='noise', status='pending'),
+            _sample_complaint(category='maintenance', status='resolved'),
+        ]
+
+        resp = self.client.get('/api/admin/analytics/')
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert sum(data['by_status'].values()) == data['total']
+        assert sum(data['by_category'].values()) == data['total']
+
+    @patch('apps.complaints.views.firestore_service')
+    def test_analytics_empty_complaints(self, mock_fs):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.admin_token}')
+        mock_fs.query.return_value = []
+
+        resp = self.client.get('/api/admin/analytics/')
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data['total'] == 0
+        assert data['by_status'] == {}
+        assert data['by_category'] == {}
+
+    def test_non_admin_gets_403(self):
+        resident_token = _make_jwt(str(uuid.uuid4()), 'resident')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {resident_token}')
+
+        resp = self.client.get('/api/admin/analytics/')
+
+        assert resp.status_code == 403
+
+    def test_committee_member_gets_403(self):
+        committee_token = _make_jwt(str(uuid.uuid4()), 'committee_member')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {committee_token}')
+
+        resp = self.client.get('/api/admin/analytics/')
+
+        assert resp.status_code == 403
+
+    def test_unauthenticated_gets_401(self):
+        resp = self.client.get('/api/admin/analytics/')
+        assert resp.status_code == 401

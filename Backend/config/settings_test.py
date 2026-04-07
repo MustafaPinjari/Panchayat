@@ -1,7 +1,12 @@
+import os
+
+# Set required env vars before importing base settings so the startup guards pass
+os.environ.setdefault('SECRET_KEY', 'test-secret-key-not-for-production')
+
 from config.settings import *  # noqa
 
 DEBUG = True
-SECRET_KEY = 'test-secret-key'
+SECRET_KEY = 'test-secret-key-not-for-production'
 
 DATABASES = {
     'default': {
