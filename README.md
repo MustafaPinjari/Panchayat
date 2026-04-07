@@ -1,234 +1,284 @@
-<div align="center">
+# Smart Society Management System
 
-# ⚡ TEAM CHAOS — Panchayat | Smart Society Management System
+A full-stack society management platform with complaint tracking, voice reports, notifications, and admin analytics.
 
-<img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=24&duration=3000&pause=1000&color=6366F1&center=true&vCenter=true&width=800&lines=AI+Powered+Society+Management;Voice+to+Complaint+Automation;Anonymous+Reporting+System;Built+with+React+%2B+Django+%2B+Firebase" />
-
-<br>
-
-<img src="https://user-images.githubusercontent.com/74038190/221352989-518609ab-b4d1-459e-929f-a08cd2bd9b3c.gif" width="400"/>
-
-</div>
+- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
+- **Backend**: Django 4 + Django REST Framework + Firebase Firestore/Storage + OpenAI Whisper
 
 ---
 
-<img src="https://user-images.githubusercontent.com/74038190/212284115-f47cd8ff-2ffb-4b04-b5bf-4d1c14c0247f.gif"/>
+## Prerequisites
 
-## 🧠 Overview
-
-A **next-generation society management platform** designed to eliminate chaos in residential communication.
-
-This system enables:
-
-* 🎤 Voice-based complaints
-* 🕵️ Anonymous reporting
-* 📊 Structured issue tracking
-* 👥 Role-based management
+| Tool | Version |
+|------|---------|
+| Python | 3.10+ |
+| Node.js | 18+ |
+| npm | 9+ |
+| Firebase project | Service account key JSON |
+| OpenAI API key | For audio transcription |
 
 ---
 
-## 🚀 Core Features
-
-### 🎤 Voice → Text Complaints
-
-* Record issues using voice
-* AI converts speech → text
-* Instantly posted in feed
-
----
-
-### 🕵️ Anonymous Reporting
-
-* Submit complaints privately
-* Encourages honest feedback
-* Protected identity system
-
----
-
-### 💬 Structured Feed System
-
-* Organized complaint dashboard
-* Category-based filtering
-* No spam like WhatsApp groups
-
----
-
-### 👥 Role-Based Access
-
-| Role             | Access                   |
-| ---------------- | ------------------------ |
-| Resident         | Create & view complaints |
-| Committee Member | Manage & respond         |
-| Admin            | Full system control      |
-
----
-
-### 📊 Admin Analytics
-
-* Complaint insights
-* Status tracking
-* Category distribution
-
----
-
-<img src="https://user-images.githubusercontent.com/74038190/212284115-f47cd8ff-2ffb-4d1c14c0247f.gif"/>
-
-## 🧰 Tech Stack
-
-<div align="center">
-
-### ⚛️ Frontend
-
-![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge\&logo=react\&logoColor=black)
-![Tailwind](https://img.shields.io/badge/TailwindCSS-38B2AC?style=for-the-badge\&logo=tailwind-css\&logoColor=white)
-
-### 🐍 Backend
-
-![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge\&logo=django\&logoColor=white)
-![DRF](https://img.shields.io/badge/DRF-ff1709?style=for-the-badge)
-
-### 🔥 Database & Storage
-
-![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge\&logo=firebase\&logoColor=black)
-
-### 🤖 AI
-
-![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge)
-
-</div>
-
----
-
-## 🏗️ Architecture
+## Project Structure
 
 ```
-Frontend (React)
-        ↓
-Backend (Django REST)
-        ↓
-Firebase (DB + Storage)
-        ↓
-Whisper API (Speech → Text)
-```
-
----
-
-## 📂 Project Structure
-
-```
-.
-├── Frontend/        # React App
-├── Backend/         # Django Backend
+/
+├── Backend/          # Django REST API
 │   ├── apps/
+│   │   ├── users/            # Auth, registration, user management
+│   │   ├── complaints/       # Complaints, comments, analytics
+│   │   ├── notifications/    # In-app notifications
+│   │   ├── audio_processing/ # Audio upload + Whisper transcription
+│   │   └── roles_permissions/# JWT middleware + RBAC
 │   ├── services/
-│   └── config/
-├── .kiro/           # Private specs (ignored)
-└── README.md
+│   │   ├── firebase_service.py
+│   │   ├── storage_service.py
+│   │   └── whisper_service.py
+│   ├── config/               # Django settings, URLs
+│   ├── docs/API.md           # Full API reference
+│   └── requirements.txt
+└── Frontend/         # React + Vite SPA
+    ├── src/
+    │   ├── services/api.ts       # Typed API client with JWT refresh
+    │   ├── context/AuthContext.tsx
+    │   ├── components/
+    │   └── app/pages/
+    └── package.json
 ```
 
 ---
 
-<img src="https://user-images.githubusercontent.com/74038190/212284115-f47cd8ff-2ffb-4d1c14c0247f.gif"/>
+## 1. Backend Setup
 
-## ⚙️ Setup Guide
-
-### 🔹 Backend
+### 1.1 Install dependencies
 
 ```bash
 cd Backend
-python -m venv venv
-source venv/bin/activate   # Linux/Mac
-venv\Scripts\activate      # Windows
-
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+### 1.2 Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `Backend/.env`:
+
+```env
+SECRET_KEY=your-long-random-secret-key
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# Firebase — download from Firebase Console → Project Settings → Service Accounts
+FIREBASE_CREDENTIALS_PATH=/absolute/path/to/serviceAccountKey.json
+FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+
+# OpenAI — https://platform.openai.com/api-keys
+OPENAI_API_KEY=sk-...
+
+# Allow the frontend dev server
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+
+JWT_ACCESS_TOKEN_LIFETIME_MINUTES=60
+JWT_REFRESH_TOKEN_LIFETIME_DAYS=7
+```
+
+> **Firebase setup**: Go to [Firebase Console](https://console.firebase.google.com) → your project → Project Settings → Service Accounts → Generate new private key. Save the JSON file and set its absolute path in `FIREBASE_CREDENTIALS_PATH`.
+
+### 1.3 Run migrations
+
+```bash
+python manage.py migrate
+```
+
+### 1.4 Start the API server
+
+```bash
 python manage.py runserver
 ```
 
+API is now live at **http://localhost:8000**
+
 ---
 
-### 🔹 Frontend
+## 2. Frontend Setup
+
+### 2.1 Install dependencies
 
 ```bash
 cd Frontend
 npm install
-npm start
 ```
 
----
+### 2.2 Verify environment
 
-### 🔐 Environment Variables
+`Frontend/.env` should already contain:
 
-```
-OPENAI_API_KEY=your_key
-FIREBASE_CREDENTIALS=your_json
-SECRET_KEY=your_secret
+```env
+VITE_API_BASE_URL=http://localhost:8000
 ```
 
----
-
-## 🔌 API Endpoints
-
-| Method | Endpoint                     | Description      |
-| ------ | ---------------------------- | ---------------- |
-| POST   | /api/complaints/audio-upload | Audio → Text     |
-| POST   | /api/complaints              | Create complaint |
-| GET    | /api/complaints              | Fetch complaints |
-| PATCH  | /api/complaints/{id}         | Update status    |
-
----
-
-## 🧠 System Flow
-
-```
-User → Records Voice 🎤
-        ↓
-Backend → Converts to Text 🤖
-        ↓
-Complaint Created 📢
-        ↓
-Visible to Committee 👥
-        ↓
-Resolved / Updated ✅
-```
-
----
-
-<img src="https://user-images.githubusercontent.com/74038190/212284115-f47cd8ff-2ffb-4d1c14c0247f.gif"/>
-
-## 🔒 Security
-
-* JWT Authentication
-* Role-based authorization
-* Secure file uploads
-* Environment protection
-
----
-
-## 🚀 Future Enhancements
-
-* 📱 Mobile App
-* 🔔 Push Notifications
-* 🧠 AI Auto Categorization
-* 🗳️ Voting System
-
----
-
-## 🤝 Contribution
+### 2.3 Start the dev server
 
 ```bash
-Fork → Branch → Commit → PR
+npm run dev
 ```
 
----
-
-## ⚡ Team
-
-<div align="center">
-
-# TEAM CHAOS ⚡
-
-Building systems that turn chaos into structure.
-
-</div>
+App is now live at **http://localhost:5173**
 
 ---
+
+## 3. Running Both Together
+
+Open two terminals:
+
+**Terminal 1 — Backend**
+```bash
+cd Backend
+source .venv/bin/activate
+python manage.py runserver
+```
+
+**Terminal 2 — Frontend**
+```bash
+cd Frontend
+npm run dev
+```
+
+Then open **http://localhost:5173** in your browser.
+
+---
+
+## 4. Verifying the Integration
+
+### 4.1 Health check
+
+```bash
+curl http://localhost:8000/api/users/login/ \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"wrongpass"}'
+# Expected: 401 {"detail": "..."} — confirms API is reachable
+```
+
+### 4.2 Register a user
+
+```bash
+curl http://localhost:8000/api/users/register/ \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "resident@example.com",
+    "password": "SecurePass123",
+    "name": "Test Resident",
+    "role": "resident",
+    "flat_number": "A-101",
+    "phone": "9876543210"
+  }'
+# Expected: 201 with user object
+```
+
+### 4.3 Login and get tokens
+
+```bash
+curl http://localhost:8000/api/users/login/ \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"email":"resident@example.com","password":"SecurePass123"}'
+# Expected: 200 with {"access": "...", "refresh": "..."}
+```
+
+### 4.4 Page-by-page smoke test
+
+| Page | URL | What to verify |
+|------|-----|----------------|
+| Login | `/` | Enter credentials → redirects to `/dashboard` |
+| Dashboard | `/dashboard` | Complaint cards load from API, search works, pagination works |
+| Complaint detail | `/complaints/:id` | Complaint data loads, comments load, reply posts |
+| Voice complaint | `/complaints/new` | Mic records audio, transcript appears, form submits |
+| Notifications | `/notifications` | List loads, mark-read updates badge in TopNav |
+| Admin analytics | `/admin` | Charts render with real data (admin role required) |
+| User management | `/admin/users` | User list loads, add/edit/delete work (admin role required) |
+| Settings | `/settings` | Profile loads, save updates, logout clears session |
+
+### 4.5 Error handling verification
+
+- **No connection**: Stop the backend, reload any page → "No connection" toast appears
+- **Session expiry**: Delete `auth_access` from localStorage, make any API call → "Session expired, please log in again" toast, redirected to login
+- **API errors**: Submit an invalid form → error message from API's `detail` field appears as toast
+
+---
+
+## 5. Running Tests
+
+### Backend tests
+
+```bash
+cd Backend
+source .venv/bin/activate
+pytest                  # all tests
+pytest -v               # verbose
+pytest apps/users/      # specific app
+```
+
+### Frontend (no test suite configured)
+
+Manual smoke testing via the checklist in section 4.4 above.
+
+---
+
+## 6. User Roles
+
+| Role | Access |
+|------|--------|
+| `resident` | Submit complaints, view own complaints, notifications, settings |
+| `committee_member` | All resident access + update complaint status, view all complaints |
+| `admin` | Full access including analytics dashboard and user management |
+
+Create users with different roles via `POST /api/users/register/` or the admin user management page.
+
+---
+
+## 7. Key API Endpoints
+
+| Action | Method | Endpoint |
+|--------|--------|----------|
+| Register | POST | `/api/users/register/` |
+| Login | POST | `/api/users/login/` |
+| Refresh token | POST | `/api/users/token/refresh/` |
+| List complaints | GET | `/api/complaints/` |
+| Submit complaint | POST | `/api/complaints/` |
+| Upload audio | POST | `/api/complaints/audio-upload/` |
+| Update status | PATCH | `/api/complaints/{id}/status/` |
+| List notifications | GET | `/api/notifications/` |
+| Mark notification read | PATCH | `/api/notifications/{id}/read/` |
+| Admin analytics | GET | `/api/admin/analytics/` |
+| List users | GET | `/api/users/` |
+
+Full reference with request/response shapes: [`Backend/docs/API.md`](Backend/docs/API.md)
+
+---
+
+## 8. Common Issues
+
+**`SECRET_KEY environment variable is not set`**
+→ Make sure `Backend/.env` exists and has a `SECRET_KEY` value.
+
+**CORS errors in browser**
+→ Confirm `CORS_ALLOWED_ORIGINS=http://localhost:5173` is in `Backend/.env` and the backend was restarted after the change.
+
+**Firebase errors on startup**
+→ Check `FIREBASE_CREDENTIALS_PATH` points to a valid service account JSON file with the correct absolute path.
+
+**Audio upload fails**
+→ Verify `OPENAI_API_KEY` is set and valid. Check `FIREBASE_STORAGE_BUCKET` is correct.
+
+**401 on every request after login**
+→ Confirm the frontend `.env` has `VITE_API_BASE_URL=http://localhost:8000` and the Vite dev server was restarted after any `.env` change.
+
+
+"email": "resident@example.com",
+    "password": "SecurePass123",

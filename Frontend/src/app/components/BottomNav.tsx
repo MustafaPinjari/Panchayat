@@ -2,13 +2,12 @@ import React from 'react';
 import { Link, useLocation } from 'react-router';
 import { Home, MessageSquare, Bell, Settings, BarChart3 } from 'lucide-react';
 import { cn } from './ui/utils';
+import { useAuth } from '../../context/AuthContext';
 
-interface BottomNavProps {
-  userRole: 'resident' | 'committee' | 'admin';
-}
-
-export function BottomNav({ userRole }: BottomNavProps) {
+export function BottomNav() {
   const location = useLocation();
+  const { user } = useAuth();
+  const userRole = user?.role ?? 'resident';
 
   const residentLinks = [
     { to: '/dashboard', icon: Home, label: 'Home' },

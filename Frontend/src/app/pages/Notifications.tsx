@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TopNav } from '../components/TopNav';
 import { Button } from '../components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   Bell,
   CheckCheck,
@@ -10,99 +10,100 @@ import {
   CheckCircle,
   Clock,
   MessageSquare,
+  Loader2,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../components/ui/utils';
+import { api } from '../../services/api';
 
 interface Notification {
   id: string;
-  type: 'complaint' | 'announcement' | 'update' | 'reminder';
-  title: string;
   message: string;
-  timestamp: string;
-  isRead: boolean;
-  icon?: React.ReactNode;
+  read_status: boolean;
+  created_at: string;
 }
 
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    type: 'update',
-    title: 'Complaint Resolved',
-    message: 'Your complaint about water supply has been resolved.',
-    timestamp: '10 minutes ago',
-    isRead: false,
-  },
-  {
-    id: '2',
-    type: 'announcement',
-    title: 'Society Meeting',
-    message: 'Monthly society meeting scheduled for this Saturday at 5 PM.',
-    timestamp: '1 hour ago',
-    isRead: false,
-  },
-  {
-    id: '3',
-    type: 'complaint',
-    title: 'New Reply',
-    message: 'Admin replied to your security gate complaint.',
-    timestamp: '2 hours ago',
-    isRead: true,
-  },
-  {
-    id: '4',
-    type: 'update',
-    title: 'Status Update',
-    message: 'Your maintenance request is now in progress.',
-    timestamp: '5 hours ago',
-    isRead: true,
-  },
-  {
-    id: '5',
-    type: 'reminder',
-    title: 'Maintenance Fee Due',
-    message: 'Monthly maintenance fee payment is due by April 15, 2026.',
-    timestamp: '1 day ago',
-    isRead: false,
-  },
-];
-
-const getNotificationIcon = (type: string) => {
-  switch (type) {
-    case 'update':
-      return <CheckCircle className="w-5 h-5 text-accent" />;
-    case 'announcement':
-      return <Bell className="w-5 h-5 text-primary" />;
-    case 'complaint':
-      return <MessageSquare className="w-5 h-5 text-primary" />;
-    case 'reminder':
-      return <Clock className="w-5 h-5 text-warning" />;
-    default:
-      return <AlertCircle className="w-5 h-5 text-muted-foreground" />;
+const getNotificationIcon = (message: string) => {
+  const lower = message.toLowerCase();
+  if (lower.includes('resolv') || lower.includes('complet')) {
+    return <CheckCircle className="w-5 h-5 text-accent" />;
   }
+  if (lower.includes('meeting') || lower.includes('announc')) {
+    return <Bell className="w-5 h-5 text-primary" />;
+  }
+  if (lower.includes('reply') || lower.includes('comment')) {
+    return <MessageSquare className="w-5 h-5 text-primary" />;
+  }
+  if (lower.includes('due') || lower.includes('remind')) {
+    return <Clock className="w-5 h-5 text-warning" />;
+  }
+  return <AlertCircle className="w-5 h-5 text-muted-foreground" />;
+};
+
+const formatTimestamp = (isoString: string): string => {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
 };
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('all');
+
+  const fetchNotifications = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.get<Notification[]>('/api/notifications/');
+      setNotifications(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load notifications');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const filteredNotifications =
     activeTab === 'all'
       ? notifications
       : activeTab === 'unread'
-      ? notifications.filter((n) => !n.isRead)
-      : notifications.filter((n) => n.isRead);
+      ? notifications.filter((n) => !n.read_status)
+      : notifications.filter((n) => n.read_status);
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.read_status).length;
 
-  const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
+  const markAsRead = async (id: string) => {
+    try {
+      await api.patch(`/api/notifications/${id}/read/`, {});
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read_status: true } : n))
+      );
+    } catch {
+      // silently fail — user can retry
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  const markAllAsRead = async () => {
+    const unread = notifications.filter((n) => !n.read_status);
+    try {
+      await Promise.all(unread.map((n) => api.patch(`/api/notifications/${n.id}/read/`, {})));
+      setNotifications((prev) => prev.map((n) => ({ ...n, read_status: true })));
+    } catch {
+      // silently fail
+    }
   };
 
   const deleteNotification = (id: string) => {
@@ -160,78 +161,97 @@ export default function Notifications() {
             </TabsList>
           </Tabs>
 
+          {/* Loading state */}
+          {loading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {/* Error state */}
+          {!loading && error && (
+            <div className="text-center py-12 space-y-3">
+              <AlertCircle className="w-12 h-12 text-destructive mx-auto opacity-70" />
+              <p className="text-muted-foreground">{error}</p>
+              <Button variant="outline" size="sm" onClick={fetchNotifications}>
+                Retry
+              </Button>
+            </div>
+          )}
+
           {/* Notifications List */}
-          <div className="space-y-3">
-            {filteredNotifications.length > 0 ? (
-              filteredNotifications.map((notification) => (
-                <motion.div
-                  key={notification.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -100 }}
-                  className={cn(
-                    'bg-card border rounded-xl p-4 transition-all hover:shadow-md group',
-                    !notification.isRead
-                      ? 'border-primary/30 bg-primary/5'
-                      : 'border-border'
-                  )}
-                >
-                  <div className="flex gap-4">
-                    <div className="shrink-0 mt-1">
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <h3 className="font-medium text-card-foreground">
-                          {notification.title}
-                        </h3>
-                        {!notification.isRead && (
-                          <div className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5" />
-                        )}
+          {!loading && !error && (
+            <div className="space-y-3">
+              {filteredNotifications.length > 0 ? (
+                filteredNotifications.map((notification) => (
+                  <motion.div
+                    key={notification.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -100 }}
+                    className={cn(
+                      'bg-card border rounded-xl p-4 transition-all hover:shadow-md group',
+                      !notification.read_status
+                        ? 'border-primary/30 bg-primary/5'
+                        : 'border-border'
+                    )}
+                  >
+                    <div className="flex gap-4">
+                      <div className="shrink-0 mt-1">
+                        {getNotificationIcon(notification.message)}
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">
-                        {notification.message}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          {notification.timestamp}
-                        </span>
-                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {!notification.isRead && (
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h3 className="font-medium text-card-foreground">
+                            {notification.message}
+                          </h3>
+                          {!notification.read_status && (
+                            <div className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5" />
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            {formatTimestamp(notification.created_at)}
+                          </span>
+                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {!notification.read_status && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => markAsRead(notification.id)}
+                                className="h-8 text-xs"
+                              >
+                                <CheckCheck className="w-3 h-3 mr-1" />
+                                Mark read
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => markAsRead(notification.id)}
-                              className="h-8 text-xs"
+                              onClick={() => deleteNotification(notification.id)}
+                              className="h-8 text-xs text-destructive hover:text-destructive"
                             >
-                              <CheckCheck className="w-3 h-3 mr-1" />
-                              Mark read
+                              <Trash2 className="w-3 h-3 mr-1" />
+                              Delete
                             </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteNotification(notification.id)}
-                            className="h-8 text-xs text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="w-3 h-3 mr-1" />
-                            Delete
-                          </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))
-            ) : (
-              <div className="text-center py-12">
-                <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-                <p className="text-muted-foreground">
-                  No notifications in this category
-                </p>
-              </div>
-            )}
-          </div>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="text-center py-12">
+                  <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                  <p className="text-muted-foreground">
+                    {activeTab === 'all'
+                      ? 'No notifications yet'
+                      : `No ${activeTab} notifications`}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
     </div>

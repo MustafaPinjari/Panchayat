@@ -1,16 +1,27 @@
 import React from 'react';
 import { cn } from './ui/utils';
-import { Droplet, Shield, Wrench, Zap, Users, Building2, Leaf, Car } from 'lucide-react';
+import { Droplet, Shield, Wrench, Zap, Users, Building2, Leaf, Car, Volume2, Sparkles, MoreHorizontal } from 'lucide-react';
 
-type Category = 'water' | 'security' | 'maintenance' | 'electricity' | 'community' | 'infrastructure' | 'garden' | 'parking';
+type Category =
+  | 'water'
+  | 'security'
+  | 'maintenance'
+  | 'electricity'
+  | 'community'
+  | 'infrastructure'
+  | 'garden'
+  | 'parking'
+  | 'noise'
+  | 'cleanliness'
+  | 'other';
 
 interface CategoryBadgeProps {
-  category: Category;
+  category: Category | string;
   className?: string;
 }
 
 export function CategoryBadge({ category, className }: CategoryBadgeProps) {
-  const categoryConfig = {
+  const categoryConfig: Record<string, { label: string; icon: React.ElementType; className: string }> = {
     water: {
       label: 'Water',
       icon: Droplet,
@@ -51,9 +62,24 @@ export function CategoryBadge({ category, className }: CategoryBadgeProps) {
       icon: Car,
       className: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800',
     },
+    noise: {
+      label: 'Noise',
+      icon: Volume2,
+      className: 'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950 dark:text-pink-300 dark:border-pink-800',
+    },
+    cleanliness: {
+      label: 'Cleanliness',
+      icon: Sparkles,
+      className: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-800',
+    },
+    other: {
+      label: 'Other',
+      icon: MoreHorizontal,
+      className: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-950 dark:text-gray-300 dark:border-gray-800',
+    },
   };
 
-  const config = categoryConfig[category];
+  const config = categoryConfig[category] ?? categoryConfig['other'];
   const Icon = config.icon;
 
   return (

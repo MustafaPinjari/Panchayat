@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from './ui/utils';
 
-type Status = 'pending' | 'in-progress' | 'resolved' | 'rejected';
+type Status = 'pending' | 'in-progress' | 'in_progress' | 'resolved' | 'rejected';
 
 interface StatusBadgeProps {
   status: Status;
@@ -9,12 +9,16 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const statusConfig = {
+  const statusConfig: Record<string, { label: string; className: string }> = {
     pending: {
       label: 'Pending',
       className: 'bg-warning/10 text-warning border-warning/20',
     },
     'in-progress': {
+      label: 'In Progress',
+      className: 'bg-primary/10 text-primary border-primary/20',
+    },
+    in_progress: {
       label: 'In Progress',
       className: 'bg-primary/10 text-primary border-primary/20',
     },
@@ -28,7 +32,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
     },
   };
 
-  const config = statusConfig[status];
+  const config = statusConfig[status] ?? statusConfig['pending'];
 
   return (
     <span

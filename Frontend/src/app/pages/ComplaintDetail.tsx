@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { TopNav } from '../components/TopNav';
 import { Button } from '../components/ui/button';
@@ -21,67 +21,137 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
-interface Reply {
+interface Complaint {
   id: string;
   text: string;
-  sender: string;
-  isAdmin: boolean;
-  timestamp: string;
+  audio_url?: string;
+  created_by?: string;
+  anonymous: boolean;
+  category: string;
+  status: 'pending' | 'in_progress' | 'resolved';
+  created_at: string;
 }
 
-const mockComplaint = {
-  id: '1',
-  title: 'Water supply disrupted in Block A since morning',
-  description:
-    'There is no water supply in Block A since morning. Multiple residents have complained about this issue. The overhead tank seems to be empty. Please look into this urgently.',
-  category: 'water' as const,
-  status: 'pending' as const,
-  timestamp: '2 hours ago',
-  author: 'Rahul Sharma',
-  unit: 'A-501',
-  isAnonymous: false,
-  replies: [
-    {
-      id: 'r1',
-      text: 'Same issue in my flat. Please fix this ASAP.',
-      sender: 'Priya Patel',
-      isAdmin: false,
-      timestamp: '1 hour ago',
-    },
-    {
-      id: 'r2',
-      text: 'We are aware of the issue. The water pump was damaged. Plumber has been called and should arrive within 2 hours.',
-      sender: 'Admin',
-      isAdmin: true,
-      timestamp: '45 minutes ago',
-    },
-    {
-      id: 'r3',
-      text: 'Thank you for the update!',
-      sender: 'Rahul Sharma',
-      isAdmin: false,
-      timestamp: '30 minutes ago',
-    },
-  ] as Reply[],
-};
+interface Comment {
+  id: string;
+  complaint_id: string;
+  created_by: string;
+  text: string;
+  created_at: string;
+}
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+function SkeletonBlock({ className }: { className?: string }) {
+  return (
+    <div className={`animate-pulse bg-muted rounded ${className ?? ''}`} />
+  );
+}
+
+function ComplaintSkeleton() {
+  return (
+    <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+      <SkeletonBlock className="h-5 w-32" />
+      <SkeletonBlock className="h-7 w-3/4" />
+      <SkeletonBlock className="h-4 w-48" />
+      <SkeletonBlock className="h-20 w-full mt-4" />
+    </div>
+  );
+}
 
 export default function ComplaintDetail() {
   const navigate = useNavigate();
-  const { id } = useParams();
-  const [newReply, setNewReply] = useState('');
-  const [complaint] = useState(mockComplaint);
-  const userRole = localStorage.getItem('userRole') || 'resident';
+  const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
 
-  const handleSendReply = (e: React.FormEvent) => {
+  const [complaint, setComplaint] = useState<Complaint | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [newReply, setNewReply] = useState('');
+  const [postingReply, setPostingReply] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  const canChangeStatus =
+    user?.role === 'committee_member' || user?.role === 'admin';
+
+  useEffect(() => {
+    if (!id) return;
+
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      setNotFound(false);
+      try {
+        const [complaintData, commentsData] = await Promise.all([
+          api.get<Complaint>('/api/complaints/' + id),
+          api.get<Comment[]>('/api/comments/' + id),
+        ]);
+        setComplaint(complaintData);
+        setComments(commentsData);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('404') || msg.includes('Not found')) {
+          setNotFound(true);
+        } else {
+          setError(msg);
+          toast.error(msg);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [id]);
+
+  const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newReply.trim()) return;
-    toast.success('Reply posted successfully');
-    setNewReply('');
+    if (!newReply.trim() || !id) return;
+    setPostingReply(true);
+    try {
+      const created = await api.post<Comment>('/api/comments/', {
+        complaint_id: id,
+        text: newReply.trim(),
+      });
+      setComments((prev) => [...prev, created]);
+      setNewReply('');
+      toast.success('Reply posted successfully');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to post reply';
+      toast.error(msg);
+    } finally {
+      setPostingReply(false);
+    }
   };
 
-  const handleStatusChange = (newStatus: string) => {
-    toast.success(`Status updated to ${newStatus}`);
+  const handleStatusChange = async (newStatus: string) => {
+    if (!id || !complaint) return;
+    setUpdatingStatus(true);
+    try {
+      const updated = await api.patch<Complaint>(
+        '/api/complaints/' + id + '/status/',
+        { status: newStatus }
+      );
+      setComplaint((prev) => (prev ? { ...prev, status: updated.status } : prev));
+      toast.success(`Status updated to ${newStatus.replace('_', ' ')}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update status';
+      toast.error(msg);
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
   return (
@@ -101,139 +171,176 @@ export default function ComplaintDetail() {
             Back to Dashboard
           </Button>
 
-          {/* Complaint Card */}
-          <div className="bg-card border border-border rounded-xl p-6 space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <CategoryBadge category={complaint.category} />
-                  <StatusBadge status={complaint.status} />
-                </div>
-                <h1 className="text-2xl font-semibold">{complaint.title}</h1>
-              </div>
-              {userRole === 'admin' && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => handleStatusChange('in-progress')}
-                    >
-                      Mark as In Progress
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleStatusChange('resolved')}
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2 text-accent" />
-                      Mark as Resolved
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleStatusChange('rejected')}
-                      className="text-destructive"
-                    >
-                      Reject Complaint
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
+          {/* Loading state */}
+          {loading && <ComplaintSkeleton />}
 
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <User className="w-4 h-4" />
-                <span>
-                  {complaint.isAnonymous ? 'Anonymous' : complaint.author}
-                </span>
-              </div>
-              {!complaint.isAnonymous && (
-                <>
-                  <span>•</span>
-                  <span>{complaint.unit}</span>
-                </>
-              )}
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                <span>{complaint.timestamp}</span>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-border">
-              <p className="text-muted-foreground leading-relaxed">
-                {complaint.description}
+          {/* 404 state */}
+          {!loading && notFound && (
+            <div className="bg-card border border-border rounded-xl p-10 text-center space-y-3">
+              <p className="text-2xl font-semibold">Complaint not found</p>
+              <p className="text-muted-foreground">
+                The complaint you're looking for doesn't exist or has been removed.
               </p>
+              <Button onClick={() => navigate('/dashboard')}>
+                Go to Dashboard
+              </Button>
             </div>
-          </div>
+          )}
 
-          {/* Replies Section */}
-          <div className="bg-card border border-border rounded-xl p-6">
-            <h2 className="font-semibold mb-4">
-              Discussion ({complaint.replies.length})
-            </h2>
+          {/* Error state */}
+          {!loading && error && !notFound && (
+            <div className="bg-card border border-destructive rounded-xl p-10 text-center space-y-3">
+              <p className="text-xl font-semibold text-destructive">
+                Something went wrong
+              </p>
+              <p className="text-muted-foreground">{error}</p>
+              <Button onClick={() => window.location.reload()}>Retry</Button>
+            </div>
+          )}
 
-            <div className="space-y-4 mb-6">
-              {complaint.replies.map((reply) => (
-                <motion.div
-                  key={reply.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`rounded-lg p-4 ${
-                    reply.isAdmin
-                      ? 'bg-primary/5 border border-primary/20'
-                      : 'bg-muted'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        reply.isAdmin
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-secondary text-secondary-foreground'
+          {/* Complaint Card */}
+          {!loading && complaint && (
+            <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CategoryBadge category={complaint.category as 'water'} />
+                    <StatusBadge status={complaint.status} />
+                  </div>
+                  <h1 className="text-2xl font-semibold">{complaint.text}</h1>
+                </div>
+
+                {canChangeStatus && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={updatingStatus}
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => handleStatusChange('pending')}
+                      >
+                        Mark as Pending
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleStatusChange('in_progress')}
+                      >
+                        Mark as In Progress
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleStatusChange('resolved')}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2 text-accent" />
+                        Mark as Resolved
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <User className="w-4 h-4" />
+                  <span>
+                    {complaint.anonymous ? 'Anonymous' : (complaint.created_by ?? 'Unknown')}
+                  </span>
+                </div>
+                <span>•</span>
+                <div className="flex items-center gap-1">
+                  <Clock className="w-4 h-4" />
+                  <span>{formatDate(complaint.created_at)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Comments / Discussion Section */}
+          {!loading && complaint && (
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h2 className="font-semibold mb-4">
+                Discussion ({comments.length})
+              </h2>
+
+              <div className="space-y-4 mb-6">
+                {comments.map((comment) => {
+                  const isPrivileged =
+                    comment.created_by === 'Admin' ||
+                    comment.created_by?.toLowerCase().includes('admin');
+                  return (
+                    <motion.div
+                      key={comment.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`rounded-lg p-4 ${
+                        isPrivileged
+                          ? 'bg-primary/5 border border-primary/20'
+                          : 'bg-muted'
                       }`}
                     >
-                      <span className="text-xs font-medium">
-                        {reply.sender.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{reply.sender}</p>
-                        {reply.isAdmin && (
-                          <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">
-                            ADMIN
+                      <div className="flex items-center gap-2 mb-2">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            isPrivileged
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-secondary text-secondary-foreground'
+                          }`}
+                        >
+                          <span className="text-xs font-medium">
+                            {(comment.created_by ?? '?').charAt(0).toUpperCase()}
                           </span>
-                        )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium">
+                              {comment.created_by ?? 'Unknown'}
+                            </p>
+                            {isPrivileged && (
+                              <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">
+                                ADMIN
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(comment.created_at)}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {reply.timestamp}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-sm">{reply.text}</p>
-                </motion.div>
-              ))}
-            </div>
+                      <p className="text-sm">{comment.text}</p>
+                    </motion.div>
+                  );
+                })}
 
-            {/* Reply Form */}
-            <form onSubmit={handleSendReply} className="space-y-3">
-              <Textarea
-                value={newReply}
-                onChange={(e) => setNewReply(e.target.value)}
-                placeholder="Add a reply..."
-                rows={3}
-                className="resize-none"
-              />
-              <div className="flex justify-end">
-                <Button type="submit">
-                  <Send className="w-4 h-4 mr-2" />
-                  Post Reply
-                </Button>
+                {comments.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No comments yet. Be the first to reply.
+                  </p>
+                )}
               </div>
-            </form>
-          </div>
+
+              {/* Reply Form */}
+              <form onSubmit={handleSendReply} className="space-y-3">
+                <Textarea
+                  value={newReply}
+                  onChange={(e) => setNewReply(e.target.value)}
+                  placeholder="Add a reply..."
+                  rows={3}
+                  className="resize-none"
+                  disabled={postingReply}
+                />
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={postingReply || !newReply.trim()}>
+                    <Send className="w-4 h-4 mr-2" />
+                    {postingReply ? 'Posting...' : 'Post Reply'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       </main>
     </div>

@@ -1,22 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router';
 import { AppSidebar } from './AppSidebar';
 import { BottomNav } from './BottomNav';
 import { Toaster } from './ui/sonner';
+import { useAuth } from '../../context/AuthContext';
+import { useEffect } from 'react';
 
 export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [userRole, setUserRole] = useState<'resident' | 'committee' | 'admin'>('resident');
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    const storedRole = localStorage.getItem('userRole') as 'resident' | 'committee' | 'admin';
-    if (!storedRole && location.pathname !== '/') {
+    if (!isAuthenticated && location.pathname !== '/') {
       navigate('/');
-    } else if (storedRole) {
-      setUserRole(storedRole);
     }
-  }, [navigate, location.pathname]);
+  }, [isAuthenticated, navigate, location.pathname]);
 
   // Don't show sidebar/bottom nav on login page
   if (location.pathname === '/') {
@@ -30,11 +29,11 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <AppSidebar userRole={userRole} />
+      <AppSidebar />
       <div className="flex-1 flex flex-col">
         <Outlet />
       </div>
-      <BottomNav userRole={userRole} />
+      <BottomNav />
       <Toaster position="top-center" richColors />
     </div>
   );

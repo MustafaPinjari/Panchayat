@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router';
 import { Layout } from './components/Layout';
+import { ProtectedRoute } from '../components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import VoiceComplaint from './pages/VoiceComplaint';
@@ -21,35 +22,35 @@ export const router = createBrowserRouter([
       },
       {
         path: 'dashboard',
-        Component: Dashboard,
+        element: <ProtectedRoute><Dashboard /></ProtectedRoute>,
       },
       {
         path: 'voice-complaint',
-        Component: VoiceComplaint,
+        element: <ProtectedRoute><VoiceComplaint /></ProtectedRoute>,
       },
       {
         path: 'complaint/:id',
-        Component: ComplaintDetail,
+        element: <ProtectedRoute><ComplaintDetail /></ProtectedRoute>,
       },
       {
         path: 'chat',
-        Component: Chat,
+        element: <ProtectedRoute><Chat /></ProtectedRoute>,
       },
       {
         path: 'admin',
-        Component: AdminDashboard,
+        element: <ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>,
       },
       {
         path: 'users',
-        Component: UserManagement,
+        element: <ProtectedRoute roles={['admin']}><UserManagement /></ProtectedRoute>,
       },
       {
         path: 'notifications',
-        Component: Notifications,
+        element: <ProtectedRoute><Notifications /></ProtectedRoute>,
       },
       {
         path: 'settings',
-        Component: Settings,
+        element: <ProtectedRoute><Settings /></ProtectedRoute>,
       },
     ],
   },

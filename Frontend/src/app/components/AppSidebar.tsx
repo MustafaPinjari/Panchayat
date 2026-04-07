@@ -10,13 +10,12 @@ import {
   Building2,
 } from 'lucide-react';
 import { cn } from './ui/utils';
+import { useAuth } from '../../context/AuthContext';
 
-interface SidebarProps {
-  userRole: 'resident' | 'committee' | 'admin';
-}
-
-export function AppSidebar({ userRole }: SidebarProps) {
+export function AppSidebar() {
   const location = useLocation();
+  const { user } = useAuth();
+  const userRole = user?.role ?? 'resident';
 
   const residentLinks = [
     { to: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -36,6 +35,14 @@ export function AppSidebar({ userRole }: SidebarProps) {
 
   const links = userRole === 'admin' ? adminLinks : residentLinks;
 
+  const displayName = user?.name || (userRole === 'admin' ? 'Admin User' : 'Resident User');
+  const initials = displayName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
   return (
     <aside className="hidden md:flex flex-col w-64 border-r border-sidebar-border bg-sidebar h-screen sticky top-0">
       <div className="p-6 border-b border-sidebar-border">
@@ -45,7 +52,9 @@ export function AppSidebar({ userRole }: SidebarProps) {
           </div>
           <div>
             <h1 className="font-semibold text-sidebar-foreground">Society Hub</h1>
-            <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
+            <p className="text-xs text-muted-foreground capitalize">
+              {userRole === 'committee_member' ? 'Committee Member' : userRole}
+            </p>
           </div>
         </div>
       </div>
@@ -76,13 +85,11 @@ export function AppSidebar({ userRole }: SidebarProps) {
       <div className="p-4 border-t border-sidebar-border">
         <div className="flex items-center gap-3 px-4 py-3">
           <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-            <span className="text-sm font-medium text-primary">
-              {userRole === 'admin' ? 'AD' : 'RS'}
-            </span>
+            <span className="text-sm font-medium text-primary">{initials}</span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
-              {userRole === 'admin' ? 'Admin User' : 'Resident User'}
+              {displayName}
             </p>
             <p className="text-xs text-muted-foreground">View Profile</p>
           </div>

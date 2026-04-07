@@ -7,8 +7,8 @@ import { motion } from 'motion/react';
 interface ComplaintCardProps {
   id: string;
   title: string;
-  category: 'water' | 'security' | 'maintenance' | 'electricity' | 'community' | 'infrastructure' | 'garden' | 'parking';
-  status: 'pending' | 'in-progress' | 'resolved' | 'rejected';
+  category: string;
+  status: 'pending' | 'in-progress' | 'in_progress' | 'resolved' | 'rejected';
   timestamp: string;
   isAnonymous?: boolean;
   author?: string;

@@ -16,9 +16,19 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
+import { useAuth } from '../../context/AuthContext';
+import { api } from '../../services/api';
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const [name, setName] = useState(user?.name ?? '');
+  const [email, setEmail] = useState(user?.email ?? '');
+  const [flatNumber, setFlatNumber] = useState('');
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -28,6 +38,18 @@ export default function Settings() {
     const isDark = document.documentElement.classList.contains('dark');
     setIsDarkMode(isDark);
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    api.get<{ flat_number: string; phone: string }>(`/api/users/${user.id}/`)
+      .then((data) => {
+        setFlatNumber(data.flat_number ?? '');
+        setPhone(data.phone ?? '');
+      })
+      .catch(() => {
+        // non-critical — fields stay empty
+      });
+  }, [user?.id]);
 
   const toggleDarkMode = (checked: boolean) => {
     setIsDarkMode(checked);
@@ -39,9 +61,21 @@ export default function Settings() {
     toast.success(`${checked ? 'Dark' : 'Light'} mode enabled`);
   };
 
+  const handleSave = async () => {
+    if (!user?.id) return;
+    setSaving(true);
+    try {
+      await api.put(`/api/users/${user.id}/`, { name, email, flat_number: flatNumber, phone });
+      toast.success('Profile updated successfully');
+    } catch {
+      toast.error('Failed to save changes');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleLogout = () => {
-    localStorage.removeItem('userRole');
-    toast.success('Logged out successfully');
+    logout();
     navigate('/');
   };
 
@@ -63,14 +97,9 @@ export default function Settings() {
                   <User className="w-10 h-10 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-medium mb-1">Resident User</h3>
-                  <p className="text-sm text-muted-foreground">
-                    resident@example.com
-                  </p>
+                  <h3 className="font-medium mb-1">{name || 'User'}</h3>
+                  <p className="text-sm text-muted-foreground">{email}</p>
                 </div>
-                <Button variant="outline" size="sm">
-                  Edit
-                </Button>
               </div>
 
               <Separator />
@@ -78,27 +107,30 @@ export default function Settings() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
-                  <Input id="name" defaultValue="Resident User" />
+                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
-                    defaultValue="resident@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="unit">Unit Number</Label>
-                  <Input id="unit" defaultValue="A-501" />
+                  <Input id="unit" value={flatNumber} onChange={(e) => setFlatNumber(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number</Label>
-                  <Input id="phone" type="tel" defaultValue="+91 98765 43210" />
+                  <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </div>
               </div>
 
-              <Button className="w-full md:w-auto">Save Changes</Button>
+              <Button className="w-full md:w-auto" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving…' : 'Save Changes'}
+              </Button>
             </div>
           </section>
 
