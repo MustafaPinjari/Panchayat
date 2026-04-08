@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router';
 import { TopNav } from '../components/TopNav';
 import {
   BarChart,
@@ -15,8 +16,9 @@ import {
   Line,
   Legend,
 } from 'recharts';
-import { TrendingUp, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { TrendingUp, AlertCircle, CheckCircle, Clock, ChevronRight, ClipboardList } from 'lucide-react';
 import { api } from '../../services/api';
+import { EmptyState } from '../components/EmptyState';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -127,7 +129,7 @@ const StatCard = ({
   trend?: string;
   variant: 'primary' | 'warning' | 'info' | 'success';
 }) => (
-  <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
+  <div className="bg-card border border-border rounded-xl p-6 shadow-card hover:shadow-card-hover transition-shadow">
     <div className="flex items-start justify-between mb-4">
       <div
         className={`w-12 h-12 rounded-xl flex items-center justify-center ${STAT_VARIANTS[variant]}`}
@@ -202,7 +204,7 @@ export default function AdminDashboard() {
   const trendData = buildTrendData(allComplaints);
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen pb-20 md:pb-0">
+    <div className="flex-1 min-w-0 flex flex-col min-h-screen pb-20 md:pb-0">
       <TopNav title="Analytics Dashboard" />
 
       <main className="flex-1 p-4 md:p-6 overflow-y-auto">
@@ -243,7 +245,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Category Distribution */}
             <div className="bg-card border border-border rounded-xl p-6">
               <h3 className="font-semibold mb-6">Complaints by Category</h3>
@@ -253,7 +255,7 @@ export default function AdminDashboard() {
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={categoryData}>
                     <CartesianGrid strokeDasharray="3 3" stroke={getCssVar('--border')} />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke={getCssVar('--muted-foreground')} />
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke={getCssVar('--muted-foreground')} angle={-35} textAnchor="end" height={50} />
                     <YAxis tick={{ fontSize: 12 }} stroke={getCssVar('--muted-foreground')} />
                     <Tooltip
                       contentStyle={{
@@ -308,7 +310,7 @@ export default function AdminDashboard() {
               <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" stroke={getCssVar('--border')} />
-                  <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke={getCssVar('--muted-foreground')} />
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke={getCssVar('--muted-foreground')} angle={-35} textAnchor="end" height={50} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke={getCssVar('--muted-foreground')} />
                   <Tooltip
                     contentStyle={{
@@ -344,7 +346,12 @@ export default function AdminDashboard() {
           {/* Recent Activity Table */}
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="p-6 border-b border-border">
-              <h3 className="font-semibold">Recent Complaints</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Recent Complaints</h3>
+                <Link to="/dashboard" className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  View All <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
             <div className="overflow-x-auto">
               {loading ? (
@@ -384,8 +391,12 @@ export default function AdminDashboard() {
                     ))}
                     {complaints.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
-                          No complaints found
+                        <td colSpan={5}>
+                          <EmptyState
+                            icon={<ClipboardList className="w-8 h-8" />}
+                            title="No complaints found"
+                            description="No complaints have been submitted yet."
+                          />
                         </td>
                       </tr>
                     )}

@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Switch } from '../components/ui/switch';
 import { Label } from '../components/ui/label';
-import { Mic, Square, Send, Loader2 } from 'lucide-react';
+import { Mic, Square, Send, Loader2, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Select,
@@ -202,7 +202,7 @@ export default function VoiceComplaint() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen pb-20 md:pb-0">
+    <div className="flex-1 min-w-0 flex flex-col min-h-screen">
       <TopNav title="Report Issue" />
 
       <main className="flex-1 p-4 md:p-6 max-w-2xl mx-auto w-full">
@@ -229,25 +229,51 @@ export default function VoiceComplaint() {
 
         {/* Recording Button */}
         <div className="flex flex-col items-center justify-center mb-8">
-          <motion.button
-            whileHover={{ scale: isDone ? 1 : 1.05 }}
-            whileTap={{ scale: isDone ? 1 : 0.95 }}
-            onClick={isRecording ? autoCategorizeThenStop : handleStartRecording}
-            disabled={isDone || !isSupported}
-            className={`relative w-32 h-32 rounded-full flex items-center justify-center transition-all ${
-              isRecording
-                ? 'bg-destructive text-destructive-foreground shadow-lg shadow-destructive/50'
-                : isDone
-                ? 'bg-accent text-accent-foreground'
-                : 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
-            } ${isDone || !isSupported ? 'cursor-not-allowed opacity-50' : ''}`}
-          >
-            {isRecording ? (
-              <Square className="w-12 h-12" />
+          <AnimatePresence mode="wait">
+            {recordingState !== 'done' ? (
+              <motion.button
+                key="record-button"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={isRecording ? autoCategorizeThenStop : handleStartRecording}
+                disabled={!isSupported}
+                className={`relative w-32 h-32 rounded-full flex items-center justify-center transition-all ${
+                  isRecording
+                    ? 'bg-destructive text-destructive-foreground shadow-lg shadow-destructive/50'
+                    : 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
+                } ${!isSupported ? 'cursor-not-allowed opacity-50' : ''}`}
+              >
+                {isRecording ? (
+                  <Square className="w-12 h-12" />
+                ) : (
+                  <Mic className="w-12 h-12" />
+                )}
+              </motion.button>
             ) : (
-              <Mic className="w-12 h-12" />
+              <motion.div
+                key="record-again-button"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+              >
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setRecordingState('idle');
+                    setTranscribedText('');
+                    setCategory('');
+                    finalTextRef.current = '';
+                  }}
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Record Again
+                </Button>
+              </motion.div>
             )}
-          </motion.button>
+          </AnimatePresence>
 
           {/* Recording Animation */}
           <AnimatePresence>

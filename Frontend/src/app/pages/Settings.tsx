@@ -5,6 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Switch } from '../components/ui/switch';
 import { Separator } from '../components/ui/separator';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import {
   User,
   Bell,
@@ -28,11 +29,14 @@ export default function Settings() {
   const [flatNumber, setFlatNumber] = useState('');
   const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [complaintUpdates, setComplaintUpdates] = useState(true);
+
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     const isDark = document.documentElement.classList.contains('dark');
@@ -61,12 +65,31 @@ export default function Settings() {
     toast.success(`${checked ? 'Dark' : 'Light'} mode enabled`);
   };
 
+  const handleNotificationToggle = async (
+    field: 'email_notifications' | 'push_notifications' | 'complaint_updates',
+    value: boolean,
+    setter: React.Dispatch<React.SetStateAction<boolean>>,
+    prevValue: boolean
+  ) => {
+    if (!user?.id) return;
+    setter(value);
+    try {
+      await api.patch(`/api/users/${user.id}/`, { [field]: value });
+      toast.success('Preferences saved');
+    } catch {
+      toast.error('Failed to save preferences');
+      setter(prevValue);
+    }
+  };
+
   const handleSave = async () => {
     if (!user?.id) return;
     setSaving(true);
     try {
       await api.put(`/api/users/${user.id}/`, { name, email, flat_number: flatNumber, phone });
       toast.success('Profile updated successfully');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
     } catch {
       toast.error('Failed to save changes');
     } finally {
@@ -80,7 +103,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen pb-20 md:pb-0">
+    <div className="flex-1 min-w-0 flex flex-col min-h-screen">
       <TopNav title="Settings" />
 
       <main className="flex-1 p-4 md:p-6 overflow-y-auto">
@@ -104,7 +127,7 @@ export default function Settings() {
 
               <Separator />
 
-              <div className="space-y-4">
+              <div className="mt-4 space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
                   <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -129,7 +152,7 @@ export default function Settings() {
               </div>
 
               <Button className="w-full md:w-auto" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving…' : 'Save Changes'}
+                {saved ? 'Saved ✓' : saving ? 'Saving…' : 'Save Changes'}
               </Button>
             </div>
           </section>
@@ -156,7 +179,9 @@ export default function Settings() {
                 <Switch
                   id="email-notif"
                   checked={emailNotifications}
-                  onCheckedChange={setEmailNotifications}
+                  onCheckedChange={(value) =>
+                    handleNotificationToggle('email_notifications', value, setEmailNotifications, emailNotifications)
+                  }
                 />
               </div>
 
@@ -177,7 +202,9 @@ export default function Settings() {
                 <Switch
                   id="push-notif"
                   checked={pushNotifications}
-                  onCheckedChange={setPushNotifications}
+                  onCheckedChange={(value) =>
+                    handleNotificationToggle('push_notifications', value, setPushNotifications, pushNotifications)
+                  }
                 />
               </div>
 
@@ -195,7 +222,9 @@ export default function Settings() {
                 <Switch
                   id="complaint-notif"
                   checked={complaintUpdates}
-                  onCheckedChange={setComplaintUpdates}
+                  onCheckedChange={(value) =>
+                    handleNotificationToggle('complaint_updates', value, setComplaintUpdates, complaintUpdates)
+                  }
                 />
               </div>
             </div>
@@ -233,10 +262,22 @@ export default function Settings() {
               <h2 className="text-xl font-semibold">Security</h2>
             </div>
             <div className="bg-card border border-border rounded-xl p-6 space-y-3">
-              <Button variant="outline" className="w-full justify-start">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() =>
+                  toast.info('Coming soon — password change will be available in a future update')
+                }
+              >
                 Change Password
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() =>
+                  toast.info('Coming soon — two-factor authentication will be available in a future update')
+                }
+              >
                 Two-Factor Authentication
               </Button>
             </div>
@@ -248,7 +289,7 @@ export default function Settings() {
               <Button
                 variant="destructive"
                 className="w-full"
-                onClick={handleLogout}
+                onClick={() => setShowLogoutConfirm(true)}
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
@@ -263,6 +304,16 @@ export default function Settings() {
           </div>
         </div>
       </main>
+
+      <ConfirmDialog
+        open={showLogoutConfirm}
+        title="Sign Out"
+        description="Are you sure you want to sign out?"
+        confirmLabel="Sign Out"
+        confirmVariant="destructive"
+        onConfirm={handleLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </div>
   );
 }

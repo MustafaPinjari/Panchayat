@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router';
 import { Home, MessageSquare, Bell, Settings, BarChart3 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { cn } from './ui/utils';
 import { useAuth } from '../../context/AuthContext';
 
@@ -33,19 +34,28 @@ export function BottomNav() {
           const isActive = location.pathname === link.to;
 
           return (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={cn(
-                'flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all min-w-0 flex-1',
-                isActive
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
+            <div key={link.to} className="relative min-w-0 flex-1">
+              {isActive && (
+                <motion.div
+                  layoutId="bottomNavPill"
+                  className="absolute inset-0 bg-primary/10 rounded-lg"
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
               )}
-            >
-              <Icon className={cn('w-5 h-5', isActive && 'fill-current')} />
-              <span className="text-[10px] font-medium truncate">{link.label}</span>
-            </Link>
+              <Link
+                to={link.to}
+                aria-current={isActive ? 'page' : undefined}
+                className={cn(
+                  'relative flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-all',
+                  isActive
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Icon className={cn('w-5 h-5', isActive && 'fill-current')} />
+                <span className="text-[10px] font-medium truncate">{link.label}</span>
+              </Link>
+            </div>
           );
         })}
       </div>

@@ -62,97 +62,119 @@ export function ComplaintCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       onClick={onClick}
-      className="bg-card border border-border rounded-xl p-4 hover:shadow-lg hover:shadow-primary/5 transition-all cursor-pointer group"
+      className="relative bg-card rounded-xl overflow-hidden cursor-pointer group transition-all duration-200"
+      style={{
+        boxShadow: 'var(--shadow-card)',
+        border: '1px solid var(--border)',
+      }}
+      whileHover={{ y: -2, boxShadow: 'var(--shadow-card-hover)' } as any}
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-card-foreground mb-1 line-clamp-2 group-hover:text-primary transition-colors">
-            {title}
-          </h3>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <User className="w-3 h-3" />
-            <span>{isAnonymous ? 'Anonymous' : author}</span>
-            <span>•</span>
-            <Clock className="w-3 h-3" />
-            <span>{timestamp}</span>
+      {/* Left accent strip */}
+      <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl transition-all duration-200 group-hover:w-1.5 ${
+        status === 'resolved' ? 'bg-status-resolved' :
+        status === 'rejected' ? 'bg-status-rejected' :
+        status === 'in_progress' || status === 'in-progress' ? 'bg-status-in-progress' :
+        status === 'assigned' ? 'bg-status-assigned' :
+        status === 'approved' ? 'bg-status-approved' :
+        'bg-status-pending'
+      }`} />
+
+      <div className="pl-5 pr-4 py-4">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-card-foreground mb-1 line-clamp-2 group-hover:text-primary transition-colors">
+              {title}
+            </h3>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <User className="w-3 h-3" />
+              <span>{isAnonymous ? 'Anonymous' : author}</span>
+              <span>•</span>
+              <Clock className="w-3 h-3" />
+              <span>{timestamp}</span>
+            </div>
+            {assignedManager && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                Assigned to: <span className="font-medium text-foreground">{assignedManager}</span>
+              </div>
+            )}
           </div>
-          {assignedManager && (
-            <div className="mt-1 text-xs text-muted-foreground">
-              Assigned to: <span className="font-medium text-foreground">{assignedManager}</span>
+          <StatusBadge status={status} />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 flex-wrap">
+            <CategoryBadge category={category} />
+            {priority && priority !== 'medium' && <PriorityBadge priority={priority} />}
+            {isOverdue && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-destructive/10 text-destructive border-destructive/20">
+                <AlertTriangle className="w-3 h-3" />
+                Overdue
+              </span>
+            )}
+          </div>
+          {replies > 0 && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>{replies} {replies === 1 ? 'reply' : 'replies'}</span>
             </div>
           )}
         </div>
-        <StatusBadge status={status} />
-      </div>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 flex-wrap">
-          <CategoryBadge category={category} />
-          {priority && priority !== 'medium' && <PriorityBadge priority={priority} />}
-          {isOverdue && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-destructive/10 text-destructive border-destructive/20">
-              <AlertTriangle className="w-3 h-3" />
-              Overdue
-            </span>
-          )}
-        </div>
-        {replies > 0 && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>{replies} {replies === 1 ? 'reply' : 'replies'}</span>
+        {showCommitteeActions && (
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border" onClick={(e) => e.stopPropagation()}>
+            {(status === 'pending') && onApprove && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={onApprove}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-status-approved/10 text-status-approved hover:bg-status-approved/20 transition-colors border border-status-approved/20"
+              >
+                Approve
+              </motion.button>
+            )}
+            {(status === 'pending') && onReject && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={onReject}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors border border-destructive/20"
+              >
+                Reject
+              </motion.button>
+            )}
+            {(status === 'approved') && onAssign && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={onAssign}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-status-assigned/10 text-status-assigned hover:bg-status-assigned/20 transition-colors border border-status-assigned/20"
+              >
+                Assign
+              </motion.button>
+            )}
+          </div>
+        )}
+
+        {showManagerActions && (
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border" onClick={(e) => e.stopPropagation()}>
+            {status === 'assigned' && onStart && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={onStart}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
+              >
+                Start
+              </motion.button>
+            )}
+            {status === 'in_progress' && onResolve && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={onResolve}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-status-resolved/10 text-status-resolved hover:bg-status-resolved/20 transition-colors border border-status-resolved/20"
+              >
+                Resolve
+              </motion.button>
+            )}
           </div>
         )}
       </div>
-
-      {showCommitteeActions && (
-        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border" onClick={(e) => e.stopPropagation()}>
-          {(status === 'pending') && onApprove && (
-            <button
-              onClick={onApprove}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-status-approved/10 text-status-approved hover:bg-status-approved/20 transition-colors"
-            >
-              Approve
-            </button>
-          )}
-          {(status === 'pending') && onReject && (
-            <button
-              onClick={onReject}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
-            >
-              Reject
-            </button>
-          )}
-          {(status === 'approved') && onAssign && (
-            <button
-              onClick={onAssign}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-status-assigned/10 text-status-assigned hover:bg-status-assigned/20 transition-colors"
-            >
-              Assign
-            </button>
-          )}
-        </div>
-      )}
-
-      {showManagerActions && (
-        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border" onClick={(e) => e.stopPropagation()}>
-          {status === 'assigned' && onStart && (
-            <button
-              onClick={onStart}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-            >
-              Start
-            </button>
-          )}
-          {status === 'in_progress' && onResolve && (
-            <button
-              onClick={onResolve}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-            >
-              Resolve
-            </button>
-          )}
-        </div>
-      )}
     </motion.div>
   );
 }

@@ -6,6 +6,7 @@ import { Label } from '../components/ui/label';
 import { Building2, Loader2, ArrowLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../../context/AuthContext';
+import { toast } from 'sonner';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -35,17 +36,39 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{
+        background: 'linear-gradient(135deg, #0f1f35 0%, #1D3557 30%, #1a3a5c 60%, #0d2240 100%)',
+      }}
+    >
+      {/* Mesh gradient orbs */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full opacity-30"
+          style={{ background: 'radial-gradient(circle, #2DE2E6 0%, transparent 70%)' }} />
+        <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full opacity-20"
+          style={{ background: 'radial-gradient(circle, #3A6EA5 0%, transparent 70%)' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-10"
+          style={{ background: 'radial-gradient(circle, #2DE2E6 0%, transparent 60%)' }} />
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md relative z-10"
       >
-        <div className="bg-card border border-border rounded-2xl shadow-xl p-8">
+        <div className="rounded-2xl p-8 shadow-2xl"
+          style={{
+            background: 'rgba(255, 255, 255, 0.07)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 32px 80px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
+          }}
+        >
           {/* Back button */}
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary mb-4 transition-colors"
+            className="flex items-center gap-1 text-sm text-white/50 hover:text-white mb-4 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Change role
@@ -53,20 +76,20 @@ export default function Login() {
 
           {/* Logo and Header */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Building2 className="w-8 h-8 text-primary-foreground" />
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
+              style={{ background: 'linear-gradient(135deg, #2DE2E6, #3A6EA5)' }}
+            >
+              <Building2 className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-card-foreground mb-2">
-              Society Hub
-            </h1>
-            <p className="text-muted-foreground capitalize">
+            <h1 className="text-2xl font-bold text-white mb-2">Society Hub</h1>
+            <p className="text-white/50 capitalize">
               Sign in as {role?.replace('_', ' ')}
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-white/70">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -74,11 +97,12 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/30 focus:border-accent focus:ring-accent/30"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-white/70">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -86,10 +110,16 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/30 focus:border-accent focus:ring-accent/30"
               />
             </div>
 
-            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full h-11 font-semibold text-white shadow-lg"
+              style={{ background: 'linear-gradient(135deg, #2DE2E6, #3A6EA5)', border: 'none' }}
+              disabled={isLoading}
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -101,23 +131,24 @@ export default function Login() {
             </Button>
 
             {error && (
-              <p className="text-destructive text-sm text-center">{error}</p>
+              <p className="text-red-400 text-sm text-center">{error}</p>
             )}
 
             <div className="text-center">
               <button
                 type="button"
-                className="text-sm text-primary hover:underline"
+                className="text-sm text-white/40 hover:text-white/70 transition-colors"
+                onClick={() => toast.info('Password reset is not yet available. Please contact your society admin.')}
               >
                 Forgot password?
               </button>
             </div>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-border text-center">
-            <p className="text-sm text-muted-foreground">
+          <div className="mt-8 pt-6 border-t border-white/10 text-center">
+            <p className="text-sm text-white/40">
               Don't have an account?{' '}
-              <button className="text-primary hover:underline font-medium">
+              <button className="text-accent hover:text-accent/80 font-medium transition-colors">
                 Contact Admin
               </button>
             </p>

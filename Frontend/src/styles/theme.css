@@ -2,17 +2,17 @@
 
 :root {
   --font-size: 16px;
-  --background: #F1FAEE;
+  --background: #f0f4f8;
   --foreground: #0E1B2D;
-  --card: #FFFFFF;
+  --card: #ffffff;
   --card-foreground: #0E1B2D;
   --popover: #ffffff;
   --popover-foreground: #1e293b;
   --primary: #1D3557;
-  --primary-foreground: #F1FAEE;
+  --primary-foreground: #ffffff;
   --secondary: #3A6EA5;
-  --secondary-foreground: #F1FAEE;
-  --muted: #E8F4F8;
+  --secondary-foreground: #ffffff;
+  --muted: #e2eaf2;
   --muted-foreground: #4A6080;
   --accent: #2DE2E6;
   --accent-foreground: #0E1B2D;
@@ -20,12 +20,35 @@
   --destructive-foreground: #ffffff;
   --warning: #f59e0b;
   --warning-foreground: #ffffff;
-  --border: #C8DCE8;
+  --border: #d0dce8;
   --input: transparent;
   --input-background: #f8fafc;
   --switch-background: #cbd5e1;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Typography Scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  /* Spacing */
+  --space-page-x: 1.5rem;
+  --space-page-y: 1.5rem;
+  --space-section-gap: 1.5rem;
+  --space-card-padding: 1.5rem;
+
+  /* Elevation */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06), 0 0 0 1px rgb(29 53 87 / 0.04);
+  --shadow-card-hover: 0 8px 24px -4px rgb(29 53 87 / 0.14), 0 2px 8px -2px rgb(29 53 87 / 0.08);
+  --shadow-floating: 0 20px 60px -8px rgb(0 0 0 / 0.20), 0 8px 20px -4px rgb(0 0 0 / 0.10);
+
   --ring: #1D3557;
   --chart-1: #4F46E5;
   --chart-2: #10b981;
@@ -202,6 +225,11 @@
   /* Secondary tokens */
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+
+  /* Shadow tokens */
+  --shadow-card: var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
+  --shadow-floating: var(--shadow-floating);
 }
 
 @layer base {
@@ -225,19 +253,19 @@
 
   h1 {
     font-size: var(--text-2xl);
-    font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-semibold);
     line-height: 1.5;
   }
 
   h2 {
     font-size: var(--text-xl);
-    font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-semibold);
     line-height: 1.5;
   }
 
   h3 {
     font-size: var(--text-lg);
-    font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-semibold);
     line-height: 1.5;
   }
 

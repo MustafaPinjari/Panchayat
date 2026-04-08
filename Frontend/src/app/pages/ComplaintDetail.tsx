@@ -5,12 +5,14 @@ import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { StatusBadge } from '../components/StatusBadge';
 import { CategoryBadge } from '../components/CategoryBadge';
+import { EmptyState } from '../components/EmptyState';
 import {
   ArrowLeft,
   Clock,
   User,
   Send,
   MoreVertical,
+  MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../../services/api';
@@ -142,6 +144,9 @@ function StatusDropdown({ onSelect, disabled, userRole, currentStatus }: {
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className="text-muted-foreground hover:text-foreground"
+        aria-label="Update complaint status"
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
         <MoreVertical className="w-4 h-4" />
       </Button>
@@ -260,7 +265,7 @@ export default function ComplaintDetail() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen pb-20 md:pb-0">
+    <div className="flex-1 min-w-0 flex flex-col min-h-screen">
       <TopNav title="Complaint Details" />
 
       <main className="flex-1">
@@ -270,7 +275,7 @@ export default function ComplaintDetail() {
             variant="ghost"
             size="sm"
             onClick={() => navigate('/dashboard')}
-            className="mb-2"
+            className="mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard
@@ -398,9 +403,11 @@ export default function ComplaintDetail() {
                 })}
 
                 {comments.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No comments yet. Be the first to reply.
-                  </p>
+                  <EmptyState
+                    icon={<MessageSquare className="w-8 h-8" />}
+                    title="No replies yet"
+                    description="Be the first to reply."
+                  />
                 )}
               </div>
 

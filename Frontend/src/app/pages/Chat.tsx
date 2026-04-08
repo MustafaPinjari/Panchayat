@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TopNav } from '../components/TopNav';
 import { Input } from '../components/ui/input';
-import { Button } from '../components/ui/button';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, ArrowLeft, MessageSquare } from 'lucide-react';
 import { motion } from 'motion/react';
 import { CategoryBadge } from '../components/CategoryBadge';
 import { cn } from '../components/ui/utils';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { EmptyState } from '../components/EmptyState';
 
 interface Complaint {
   id: string;
@@ -51,6 +51,7 @@ export default function Chat() {
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingComments, setLoadingComments] = useState(false);
   const [sending, setSending] = useState(false);
+  const [mobileView, setMobileView] = useState<'threads' | 'messages'>('threads');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Load complaint threads
@@ -102,12 +103,18 @@ export default function Chat() {
     user?.id !== undefined && String(comment.created_by) === String(user.id);
 
   return (
-    <div className="flex-1 flex flex-col h-screen pb-20 md:pb-0">
+    <div className="flex-1 min-w-0 flex flex-col h-screen pb-20 md:pb-0">
       <TopNav title="Communication" />
 
       <div className="flex-1 flex overflow-hidden">
         {/* Thread List */}
-        <div className="w-full md:w-80 border-r border-border bg-muted/30 overflow-y-auto">
+        <div
+          className={cn(
+            'w-full md:w-80 border-r border-border bg-muted/30 overflow-y-auto flex-col',
+            mobileView === 'threads' ? 'flex' : 'hidden',
+            'md:flex'
+          )}
+        >
           <div className="p-4 border-b border-border">
             <h3 className="font-semibold">Active Discussions</h3>
           </div>
@@ -117,20 +124,28 @@ export default function Chat() {
               <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
             </div>
           ) : threads.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">No complaints yet.</p>
+            <EmptyState
+              icon={<MessageSquare className="w-8 h-8" />}
+              title="No discussions yet"
+              description="Complaints will appear here once submitted."
+            />
           ) : (
             <div className="divide-y divide-border">
               {threads.map((thread) => (
                 <button
                   key={thread.id}
-                  onClick={() => setSelectedThread(thread)}
+                  aria-label={`Open discussion: ${thread.text.slice(0, 60)}`}
+                  onClick={() => {
+                    setSelectedThread(thread);
+                    setMobileView('messages');
+                  }}
                   className={cn(
                     'w-full p-4 text-left hover:bg-accent/50 transition-colors',
                     selectedThread?.id === thread.id && 'bg-accent/70'
                   )}
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <h4 className="font-medium text-sm line-clamp-2">{thread.text}</h4>
+                    <h4 className="font-medium text-base line-clamp-2">{thread.text}</h4>
                     <span className="text-xs text-muted-foreground shrink-0">
                       {formatTime(thread.created_at)}
                     </span>
@@ -143,87 +158,111 @@ export default function Chat() {
         </div>
 
         {/* Chat Area */}
-        {selectedThread ? (
-          <div className="flex-1 flex flex-col">
-            {/* Chat Header */}
-            <div className="p-4 border-b border-border bg-card">
-              <h3 className="font-semibold mb-1 line-clamp-1">{selectedThread.text}</h3>
-              <CategoryBadge category={selectedThread.category as any} />
-            </div>
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {loadingComments ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        <div
+          className={cn(
+            'flex-1 flex-col',
+            mobileView === 'messages' ? 'flex' : 'hidden',
+            'md:flex'
+          )}
+        >
+          {selectedThread ? (
+            <>
+              {/* Chat Header */}
+              <div className="p-4 border-b border-border bg-card flex items-center gap-3">
+                <button
+                  className="md:hidden"
+                  aria-label="Back to thread list"
+                  onClick={() => setMobileView('threads')}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold mb-1 line-clamp-1">{selectedThread.text}</h3>
+                  <CategoryBadge category={selectedThread.category as any} />
                 </div>
-              ) : comments.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground mt-8">
-                  No replies yet. Be the first to comment.
-                </p>
-              ) : (
-                comments.map((comment) => {
-                  const mine = isMyMessage(comment);
-                  return (
-                    <motion.div
-                      key={comment.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={cn('flex', mine ? 'justify-end' : 'justify-start')}
-                    >
-                      <div
-                        className={cn(
-                          'max-w-[80%] md:max-w-[60%] rounded-2xl px-4 py-3',
-                          mine
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-primary/10'
-                        )}
-                      >
-                        {!mine && (
-                          <p className="text-xs font-medium mb-1 text-primary">
-                            {comment.created_by}
-                          </p>
-                        )}
-                        <p className="text-sm">{comment.text}</p>
-                        <p className="text-[10px] opacity-60 mt-1">
-                          {formatTime(comment.created_at)}
-                        </p>
-                      </div>
-                    </motion.div>
-                  );
-                })
-              )}
-              <div ref={bottomRef} />
-            </div>
-
-            {/* Message Input */}
-            <form
-              onSubmit={handleSendMessage}
-              className="p-4 border-t border-border bg-card"
-            >
-              <div className="flex items-center gap-2">
-                <Input
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type your message..."
-                  className="flex-1"
-                  disabled={sending}
-                />
-                <Button type="submit" size="icon" disabled={sending || !newMessage.trim()}>
-                  {sending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                </Button>
               </div>
-            </form>
-          </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-            Select a discussion to view messages
-          </div>
-        )}
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {loadingComments ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : comments.length === 0 ? (
+                  <EmptyState
+                    icon={<MessageSquare className="w-8 h-8" />}
+                    title="No messages yet"
+                    description="Be the first to reply."
+                  />
+                ) : (
+                  comments.map((comment) => {
+                    const mine = isMyMessage(comment);
+                    return (
+                      <motion.div
+                        key={comment.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={cn('flex', mine ? 'justify-end' : 'justify-start')}
+                      >
+                        <div
+                          className={cn(
+                            'max-w-[80%] md:max-w-[60%] rounded-2xl px-4 py-3',
+                            mine
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-primary/10'
+                          )}
+                        >
+                          {!mine && (
+                            <p className="text-xs font-medium mb-1 text-primary">
+                              {comment.created_by}
+                            </p>
+                          )}
+                          <p className="text-sm">{comment.text}</p>
+                          <p className="text-[10px] opacity-60 mt-1">
+                            {formatTime(comment.created_at)}
+                          </p>
+                        </div>
+                      </motion.div>
+                    );
+                  })
+                )}
+                <div ref={bottomRef} />
+              </div>
+
+              {/* Message Input */}
+              <form
+                onSubmit={handleSendMessage}
+                className="p-4 border-t border-border bg-card"
+              >
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type your message..."
+                    className="flex-1"
+                    disabled={sending}
+                  />
+                  <motion.button
+                    type="submit"
+                    whileTap={{ scale: 0.9 }}
+                    disabled={sending || !newMessage.trim()}
+                    className="inline-flex items-center justify-center h-10 w-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                  >
+                    {sending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                  </motion.button>
+                </div>
+              </form>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+              Select a discussion to view messages
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

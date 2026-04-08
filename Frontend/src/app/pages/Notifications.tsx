@@ -12,9 +12,11 @@ import {
   MessageSquare,
   Loader2,
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { EmptyState } from '../components/EmptyState';
 import { cn } from '../components/ui/utils';
 import { api } from '../../services/api';
+
 
 interface Notification {
   id: string;
@@ -111,25 +113,21 @@ export default function Notifications() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen pb-20 md:pb-0">
+    <div className="flex-1 min-w-0 flex flex-col min-h-screen pb-20 md:pb-0">
       <TopNav title="Notifications" />
 
       <main className="flex-1 p-4 md:p-6 overflow-y-auto">
         <div className="max-w-3xl mx-auto space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold mb-1">Notifications</h2>
-              <p className="text-muted-foreground">
-                {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
-              </p>
-            </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-muted-foreground">
+              {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+            </p>
             {unreadCount > 0 && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={markAllAsRead}
-                className="hidden md:flex"
               >
                 <CheckCheck className="w-4 h-4 mr-2" />
                 Mark all read
@@ -181,76 +179,83 @@ export default function Notifications() {
 
           {/* Notifications List */}
           {!loading && !error && (
-            <div className="space-y-3">
-              {filteredNotifications.length > 0 ? (
-                filteredNotifications.map((notification) => (
-                  <motion.div
-                    key={notification.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: -100 }}
-                    className={cn(
-                      'bg-card border rounded-xl p-4 transition-all hover:shadow-md group',
-                      !notification.read_status
-                        ? 'border-primary/30 bg-primary/5'
-                        : 'border-border'
-                    )}
-                  >
-                    <div className="flex gap-4">
-                      <div className="shrink-0 mt-1">
-                        {getNotificationIcon(notification.message)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h3 className="font-medium text-card-foreground">
-                            {notification.message}
-                          </h3>
-                          {!notification.read_status && (
-                            <div className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5" />
-                          )}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
+                className="space-y-3"
+              >
+                {filteredNotifications.length > 0 ? (
+                  filteredNotifications.map((notification, index) => (
+                    <motion.div
+                      key={notification.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, x: -100 }}
+                      transition={{ delay: index * 0.05, duration: 0.3 }}
+                      className={cn(
+                        'bg-card border rounded-xl p-4 transition-all hover:shadow-md group',
+                        !notification.read_status
+                          ? 'border-primary/30 bg-primary/5'
+                          : 'border-border'
+                      )}
+                    >
+                      <div className="flex gap-4">
+                        <div className="shrink-0 mt-1">
+                          {getNotificationIcon(notification.message)}
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">
-                            {formatTimestamp(notification.created_at)}
-                          </span>
-                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <h3 className="font-medium text-card-foreground">
+                              {notification.message}
+                            </h3>
                             {!notification.read_status && (
+                              <div className="w-2 h-2 bg-primary rounded-full shrink-0 mt-1.5" />
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">
+                              {formatTimestamp(notification.created_at)}
+                            </span>
+                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {!notification.read_status && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => markAsRead(notification.id)}
+                                  className="h-8 text-xs"
+                                >
+                                  <CheckCheck className="w-3 h-3 mr-1" />
+                                  Mark read
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => markAsRead(notification.id)}
-                                className="h-8 text-xs"
+                                onClick={() => deleteNotification(notification.id)}
+                                className="h-8 text-xs text-destructive hover:text-destructive"
                               >
-                                <CheckCheck className="w-3 h-3 mr-1" />
-                                Mark read
+                                <Trash2 className="w-3 h-3 mr-1" />
+                                Delete
                               </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => deleteNotification(notification.id)}
-                              className="h-8 text-xs text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="w-3 h-3 mr-1" />
-                              Delete
-                            </Button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))
-              ) : (
-                <div className="text-center py-12">
-                  <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-                  <p className="text-muted-foreground">
-                    {activeTab === 'all'
-                      ? 'No notifications yet'
-                      : `No ${activeTab} notifications`}
-                  </p>
-                </div>
-              )}
-            </div>
+                    </motion.div>
+                  ))
+                ) : (
+                  <EmptyState
+                    icon={<Bell className="w-8 h-8" />}
+                    title="No notifications"
+                    description="You're all caught up!"
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
           )}
         </div>
       </main>

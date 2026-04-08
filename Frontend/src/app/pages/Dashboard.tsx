@@ -3,12 +3,16 @@ import { useNavigate } from 'react-router';
 import { TopNav } from '../components/TopNav';
 import { ComplaintCard } from '../components/ComplaintCard';
 import { FAB } from '../components/FAB';
-import { Mic, RefreshCw, X, Wifi } from 'lucide-react';
+import { Mic, RefreshCw, Wifi, ClipboardList } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
+import { SkeletonCard } from '../components/SkeletonCard';
+import { AssignModal } from '../components/AssignModal';
+import { EmptyState } from '../components/EmptyState';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 const POLL_INTERVAL_MS = 10_000; // 10 seconds
 
@@ -24,12 +28,6 @@ interface Complaint {
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   assigned_to?: string | null;
   approved_by?: string | null;
-}
-
-interface Manager {
-  id: string;
-  name: string;
-  email: string;
 }
 
 interface PaginatedResponse<T> {
@@ -51,114 +49,6 @@ function formatTimestamp(isoString: string): string {
   return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
 }
 
-function SkeletonCard() {
-  return (
-    <div className="bg-card border border-border rounded-xl p-4 animate-pulse">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex-1 space-y-2">
-          <div className="h-4 bg-muted rounded w-3/4" />
-          <div className="h-3 bg-muted rounded w-1/2" />
-        </div>
-        <div className="h-5 bg-muted rounded-full w-20" />
-      </div>
-      <div className="h-6 bg-muted rounded-lg w-24" />
-    </div>
-  );
-}
-
-// ── Assign Modal ─────────────────────────────────────────────────────────────
-
-function AssignModal({
-  complaintId,
-  onClose,
-  onAssigned,
-}: {
-  complaintId: string;
-  onClose: () => void;
-  onAssigned: (complaintId: string) => void;
-}) {
-  const [managers, setManagers] = useState<Manager[]>([]);
-  const [loadingManagers, setLoadingManagers] = useState(true);
-  const [selectedId, setSelectedId] = useState('');
-  const [assigning, setAssigning] = useState(false);
-
-  useEffect(() => {
-    api.get<PaginatedResponse<Manager>>('/api/users/managers/')
-      .then((data) => setManagers(data.results ?? []))
-      .catch(() => toast.error('Could not load managers'))
-      .finally(() => setLoadingManagers(false));
-  }, []);
-
-  const handleAssign = async () => {
-    if (!selectedId) return;
-    setAssigning(true);
-    try {
-      await api.patch(`/api/complaints/${complaintId}/assign/`, { manager_id: selectedId });
-      toast.success('Complaint assigned successfully');
-      onAssigned(complaintId);
-      onClose();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Assignment failed');
-    } finally {
-      setAssigning(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Assign to Manager</h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {loadingManagers ? (
-          <div className="space-y-2">
-            <div className="h-10 bg-muted rounded animate-pulse" />
-            <div className="h-10 bg-muted rounded animate-pulse" />
-          </div>
-        ) : managers.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No property managers found. Register a manager account first.
-          </p>
-        ) : (
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {managers.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setSelectedId(m.id)}
-                className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
-                  selectedId === m.id
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-border hover:bg-muted'
-                }`}
-              >
-                <p className="font-medium text-sm">{m.name}</p>
-                <p className="text-xs text-muted-foreground">{m.email}</p>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="flex gap-2 pt-2">
-          <Button variant="outline" className="flex-1" onClick={onClose} disabled={assigning}>
-            Cancel
-          </Button>
-          <Button
-            className="flex-1"
-            onClick={handleAssign}
-            disabled={!selectedId || assigning || loadingManagers}
-          >
-            {assigning ? 'Assigning...' : 'Assign'}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -172,6 +62,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [assigningComplaintId, setAssigningComplaintId] = useState<string | null>(null);
+  const [rejectingComplaintId, setRejectingComplaintId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isLive, setIsLive] = useState(true);
@@ -285,37 +176,50 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen pb-20 md:pb-0">
+    <div className="flex-1 min-w-0 flex flex-col min-h-screen">
       <TopNav title="Dashboard" showSearch onSearch={handleSearch} />
 
-      <main className="flex-1 p-4 md:p-6 max-w-4xl mx-auto w-full">
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-2xl font-semibold">Welcome Back!</h2>
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <main className="flex-1 p-4 md:p-6 max-w-4xl mx-auto w-full min-w-0">
+        <div className="mb-6 rounded-2xl p-5 relative overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, #1D3557 0%, #2A4A6B 50%, #1a3a5c 100%)',
+            boxShadow: '0 4px 24px rgba(29,53,87,0.25)',
+          }}
+        >
+          {/* Glow orb */}
+          <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, rgba(45,226,230,0.2) 0%, transparent 70%)' }} />
+          <div className="relative flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-xl font-bold text-white mb-1">Welcome Back!</h2>
+              <p className="text-white/60 text-sm">
+                Stay updated with your society's latest complaints
+              </p>
+            </div>
+            <span className="flex items-center gap-1.5 text-xs text-white/60 bg-white/10 px-2.5 py-1.5 rounded-full shrink-0">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-resolved opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-status-resolved" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                <span className="sr-only">Live updates active</span>
               </span>
               <Wifi className="w-3 h-3" />
               Live
             </span>
           </div>
-          <p className="text-muted-foreground">
-            Stay updated with your society's latest complaints and announcements
-          </p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-          <TabsList className="w-full md:w-auto">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
-            <TabsTrigger value="approved">Approved</TabsTrigger>
-            <TabsTrigger value="assigned">Assigned</TabsTrigger>
-            <TabsTrigger value="in_progress">In Progress</TabsTrigger>
-            <TabsTrigger value="resolved">Resolved</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="mb-6 -mx-1 px-1 overflow-x-auto">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="w-max min-w-full md:w-auto">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="pending">Pending</TabsTrigger>
+              <TabsTrigger value="approved">Approved</TabsTrigger>
+              <TabsTrigger value="assigned">Assigned</TabsTrigger>
+              <TabsTrigger value="in_progress">In Progress</TabsTrigger>
+              <TabsTrigger value="resolved">Resolved</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
         {loading && (
           <div className="space-y-4">
@@ -363,7 +267,7 @@ export default function Dashboard() {
                   }
                   onReject={
                     isCommitteeOrAdmin && complaint.status === 'pending'
-                      ? () => updateComplaintStatus(complaint.id, 'rejected')
+                      ? () => setRejectingComplaintId(complaint.id)
                       : undefined
                   }
                   onAssign={
@@ -375,9 +279,17 @@ export default function Dashboard() {
                 />
               ))
             ) : (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No complaints found</p>
-              </div>
+              <EmptyState
+                icon={<ClipboardList className="w-8 h-8" />}
+                title="No complaints found"
+                description={
+                  searchQuery
+                    ? 'No complaints match your search. Try a different keyword.'
+                    : activeTab !== 'all'
+                    ? 'No complaints with this status yet.'
+                    : 'No complaints have been submitted yet.'
+                }
+              />
             )}
 
             {nextUrl && (
@@ -400,6 +312,7 @@ export default function Dashboard() {
         onClick={() => navigate('/voice-complaint')}
         icon={<Mic className="w-5 h-5" />}
         label="Report Issue"
+        ariaLabel="Report Issue"
       />
 
       {assigningComplaintId && (
@@ -413,6 +326,21 @@ export default function Dashboard() {
           }
         />
       )}
+
+      <ConfirmDialog
+        open={rejectingComplaintId !== null}
+        title="Reject Complaint"
+        description="This will permanently reject the complaint. This action cannot be undone."
+        confirmLabel="Reject"
+        confirmVariant="destructive"
+        onConfirm={() => {
+          if (rejectingComplaintId) {
+            updateComplaintStatus(rejectingComplaintId, 'rejected');
+            setRejectingComplaintId(null);
+          }
+        }}
+        onCancel={() => setRejectingComplaintId(null)}
+      />
     </div>
   );
 }
