@@ -4,6 +4,7 @@ from apps.complaints.views import (
     AnalyticsView,
     CommentCreateView,
     CommentListView,
+    ComplaintAssignView,
     ComplaintDetailView,
     ComplaintListCreateView,
     ComplaintStatusView,
@@ -14,6 +15,7 @@ complaint_urlpatterns = [
     path('', ComplaintListCreateView.as_view(), name='complaint-list-create'),
     path('<str:id>/', ComplaintDetailView.as_view(), name='complaint-detail'),
     path('<str:id>/status/', ComplaintStatusView.as_view(), name='complaint-status'),
+    path('<str:id>/assign/', ComplaintAssignView.as_view(), name='complaint-assign'),
 ]
 
 comment_urlpatterns = [

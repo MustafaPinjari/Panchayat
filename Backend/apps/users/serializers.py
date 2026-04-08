@@ -7,7 +7,7 @@ from rest_framework import serializers
 
 from services.firebase_service import firestore_service
 
-VALID_ROLES = ('resident', 'committee_member', 'admin')
+VALID_ROLES = ('resident', 'committee_member', 'admin', 'manager')
 
 
 class UserSerializer(serializers.Serializer):

@@ -34,6 +34,32 @@ class IsCommitteeOrAdmin(BasePermission):
         )
 
 
+class IsPropertyManager(BasePermission):
+    """Allows access only to users with role == 'manager'."""
+
+    message = 'Only property managers are allowed to perform this action.'
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'role', None) == 'manager'
+        )
+
+
+class IsManagerOrCommitteeOrAdmin(BasePermission):
+    """Allows access to manager, committee_member, or admin roles."""
+
+    message = 'Only property managers, committee members, or administrators can perform this action.'
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and getattr(request.user, 'role', None) in ('manager', 'committee_member', 'admin')
+        )
+
+
 class IsOwnerOrAdmin(BasePermission):
     """
     Object-level permission: allows access if the requesting user is the

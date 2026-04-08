@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from apps.complaints.urls import comment_urlpatterns
-from apps.complaints.views import AnalyticsView
+from apps.complaints.views import AnalyticsView, ManagerTaskListView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -13,4 +13,5 @@ urlpatterns = [
     # Comments — wired from apps/complaints/urls.py
     path('api/comments/', include((comment_urlpatterns, 'comments'))),
     path('api/admin/analytics/', AnalyticsView.as_view(), name='admin-analytics'),
+    path('api/manager/tasks/', ManagerTaskListView.as_view(), name='manager-tasks'),
 ]

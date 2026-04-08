@@ -7,7 +7,7 @@ CommentSerializer    — comment document
 from rest_framework import serializers
 
 VALID_CATEGORIES = ('water', 'security', 'maintenance', 'noise', 'cleanliness', 'other')
-VALID_STATUSES = ('pending', 'in_progress', 'resolved')
+VALID_STATUSES = ('pending', 'approved', 'assigned', 'in_progress', 'resolved', 'rejected')
 
 
 class ComplaintSerializer(serializers.Serializer):
@@ -19,6 +19,10 @@ class ComplaintSerializer(serializers.Serializer):
     category = serializers.ChoiceField(choices=VALID_CATEGORIES)
     status = serializers.ChoiceField(choices=VALID_STATUSES, default='pending')
     created_at = serializers.CharField(read_only=True)
+    # New fields — read-only, nullable, backward-compatible
+    assigned_to = serializers.CharField(read_only=True, allow_null=True, required=False, default=None)
+    approved_by = serializers.CharField(read_only=True, allow_null=True, required=False, default=None)
+    resolved_at = serializers.CharField(read_only=True, allow_null=True, required=False, default=None)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -29,6 +33,10 @@ class ComplaintSerializer(serializers.Serializer):
         )
         if instance.get('anonymous') and not is_admin:
             data.pop('created_by', None)
+        # Backward compatibility: fill None for missing new fields
+        for field in ('assigned_to', 'approved_by', 'resolved_at'):
+            if field not in instance:
+                data[field] = None
         return data
 
 

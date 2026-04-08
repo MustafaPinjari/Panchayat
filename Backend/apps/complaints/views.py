@@ -23,7 +23,7 @@ from apps.complaints.serializers import (
     ComplaintSerializer,
 )
 from apps.notifications.service import notification_service
-from apps.roles_permissions.permissions import IsAdmin, IsCommitteeOrAdmin
+from apps.roles_permissions.permissions import IsAdmin, IsCommitteeOrAdmin, IsManagerOrCommitteeOrAdmin
 from services.firebase_service import firestore_service
 
 logger = logging.getLogger(__name__)
@@ -102,6 +102,9 @@ class ComplaintListCreateView(APIView):
             'category': serializer.validated_data['category'],
             'status': 'pending',
             'created_at': _now_iso(),
+            'assigned_to': None,
+            'approved_by': None,
+            'resolved_at': None,
         }
 
         try:
@@ -147,10 +150,23 @@ class ComplaintDetailView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class ComplaintStatusView(APIView):
-    """PATCH /api/complaints/{id}/status/ — Committee or Admin only."""
+_STATUS_TRANSITIONS = {
+    'committee_member': {
+        'pending': {'approved', 'rejected'},
+    },
+    'manager': {
+        'assigned': {'in_progress'},
+        'in_progress': {'resolved'},
+    },
+}
 
-    permission_classes = [IsCommitteeOrAdmin]
+_TERMINAL_STATUSES = {'resolved', 'rejected'}
+
+
+class ComplaintStatusView(APIView):
+    """PATCH /api/complaints/{id}/status/ — role-based transition matrix."""
+
+    permission_classes = [IsAuthenticated]
 
     def patch(self, request, id):
         new_status = request.data.get('status')
@@ -178,8 +194,60 @@ class ComplaintStatusView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        current_status = complaint.get('status')
+        role = getattr(request.user, 'role', None)
+
+        # Terminal state guard
+        if current_status in _TERMINAL_STATUSES:
+            return Response(
+                {'error': 'Complaint is already in a terminal state.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        _forbidden = Response(
+            {'error': 'You do not have permission to perform this status transition.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+        if role == 'admin':
+            # Admin bypasses matrix
+            pass
+        elif role == 'resident':
+            return _forbidden
+        elif role == 'manager':
+            user_id = getattr(request.user, 'user_id', None)
+            if complaint.get('assigned_to') != user_id:
+                return _forbidden
+            allowed = _STATUS_TRANSITIONS.get('manager', {}).get(current_status, set())
+            if new_status not in allowed:
+                return Response(
+                    {
+                        'error': 'Invalid status transition.',
+                        'detail': f"Cannot move from '{current_status}' to '{new_status}'.",
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+        elif role == 'committee_member':
+            allowed = _STATUS_TRANSITIONS.get('committee_member', {}).get(current_status, set())
+            if new_status not in allowed:
+                return Response(
+                    {
+                        'error': 'Invalid status transition.',
+                        'detail': f"Cannot move from '{current_status}' to '{new_status}'.",
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+        else:
+            return _forbidden
+
+        update_data = {'status': new_status}
+        if new_status == 'approved':
+            update_data['approved_by'] = getattr(request.user, 'user_id', None)
+        if new_status == 'resolved':
+            update_data['resolved_at'] = _now_iso()
+
         try:
-            firestore_service.update('complaints', id, {'status': new_status})
+            firestore_service.update('complaints', id, update_data)
         except Exception as exc:
             logger.error('Firestore update failed in ComplaintStatusView: %s', exc)
             return Response(
@@ -187,19 +255,152 @@ class ComplaintStatusView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        complaint['status'] = new_status
+        complaint.update(update_data)
 
-        # Notify the original submitter if not anonymous and status changed meaningfully
-        if new_status in ('in_progress', 'resolved'):
-            submitter_id = complaint.get('created_by')
-            if submitter_id and not complaint.get('anonymous'):
-                notification_service.create_notification(
-                    submitter_id,
-                    f"Your complaint status has been updated to '{new_status}'.",
-                )
+        submitter_id = complaint.get('created_by')
+        if submitter_id and not complaint.get('anonymous'):
+            if new_status == 'approved':
+                notification_service.create_notification(submitter_id, "Your complaint has been approved.")
+            elif new_status == 'in_progress':
+                notification_service.create_notification(submitter_id, "Your complaint status has been updated to 'in_progress'.")
+            elif new_status == 'resolved':
+                notification_service.create_notification(submitter_id, "Your complaint has been resolved.")
 
         serializer = ComplaintSerializer(complaint, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ComplaintAssignView(APIView):
+    """PATCH /api/complaints/{id}/assign/ — Committee or Admin only."""
+
+    permission_classes = [IsCommitteeOrAdmin]
+
+    def patch(self, request, id):
+        manager_id = request.data.get('manager_id')
+        if not manager_id:
+            return Response(
+                {'error': 'manager_id is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            complaint = firestore_service.get('complaints', id)
+        except Exception as exc:
+            logger.error('Firestore get failed in ComplaintAssignView: %s', exc)
+            return Response(
+                {'error': 'Could not retrieve complaint.', 'detail': str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if complaint is None:
+            return Response(
+                {'error': 'Complaint not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if complaint.get('status') != 'approved':
+            return Response(
+                {
+                    'error': 'Invalid status transition.',
+                    'detail': "Complaint must be in 'approved' status to be assigned.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        try:
+            target_user = firestore_service.get('users', manager_id)
+        except Exception as exc:
+            logger.error('Firestore get failed for user in ComplaintAssignView: %s', exc)
+            target_user = None
+
+        if not target_user or target_user.get('role') != 'manager':
+            return Response(
+                {'error': 'Target user is not a valid Property Manager.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            assigned_complaints = firestore_service.query(
+                'complaints',
+                filters=[('assigned_to', '==', manager_id), ('status', '==', 'assigned')],
+            )
+            in_progress_complaints = firestore_service.query(
+                'complaints',
+                filters=[('assigned_to', '==', manager_id), ('status', '==', 'in_progress')],
+            )
+        except Exception as exc:
+            logger.error('Firestore query failed in ComplaintAssignView capacity check: %s', exc)
+            return Response(
+                {'error': 'Could not check manager capacity.', 'detail': str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if len(assigned_complaints) + len(in_progress_complaints) >= 20:
+            return Response(
+                {
+                    'error': 'Manager is at capacity.',
+                    'detail': 'This manager already has 20 or more active complaints.',
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        update_data = {'assigned_to': manager_id, 'status': 'assigned'}
+        try:
+            firestore_service.update('complaints', id, update_data)
+        except Exception as exc:
+            logger.error('Firestore update failed in ComplaintAssignView: %s', exc)
+            return Response(
+                {'error': 'Could not assign complaint.', 'detail': str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        complaint.update(update_data)
+
+        notification_service.create_notification(
+            manager_id,
+            f"You have been assigned complaint {id}: {complaint.get('text', '')[:100]}",
+        )
+
+        submitter_id = complaint.get('created_by')
+        if submitter_id and not complaint.get('anonymous'):
+            notification_service.create_notification(
+                submitter_id,
+                "Your complaint has been assigned to a property manager.",
+            )
+
+        serializer = ComplaintSerializer(complaint, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ManagerTaskListView(APIView):
+    """GET /api/manager/tasks/ — Manager, Committee, or Admin."""
+
+    permission_classes = [IsManagerOrCommitteeOrAdmin]
+
+    def get(self, request):
+        role = getattr(request.user, 'role', None)
+
+        try:
+            if role == 'manager':
+                complaints = firestore_service.query(
+                    'complaints',
+                    filters=[('assigned_to', '==', request.user.user_id)],
+                )
+            else:
+                # admin or committee_member: return all assigned complaints
+                all_complaints = firestore_service.query('complaints')
+                complaints = [c for c in all_complaints if c.get('assigned_to') is not None]
+        except Exception as exc:
+            logger.error('Firestore query failed in ManagerTaskListView: %s', exc)
+            return Response(
+                {'error': 'Could not retrieve tasks.', 'detail': str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        serializer = ComplaintSerializer(complaints, many=True, context={'request': request})
+        paginator = _ComplaintPagination()
+        page = paginator.paginate_queryset(serializer.data, request)
+        return paginator.get_paginated_response(page)
 
 
 class CommentCreateView(APIView):

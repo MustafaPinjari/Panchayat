@@ -204,18 +204,19 @@ class TestComplaintStatusView:
     def test_committee_can_update_status(self, mock_fs, mock_notif):
         token = _make_jwt(str(uuid.uuid4()), 'committee_member')
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
-        mock_fs.get.return_value = _sample_complaint(cid=self.cid)
+        # Committee can move pending → approved (valid transition in new matrix)
+        mock_fs.get.return_value = _sample_complaint(cid=self.cid, status='pending')
         mock_fs.update.return_value = None
         mock_notif.create_notification.return_value = None
 
         resp = self.client.patch(
             f'/api/complaints/{self.cid}/status/',
-            {'status': 'in_progress'},
+            {'status': 'approved'},
             format='json',
         )
 
         assert resp.status_code == 200
-        assert resp.json()['status'] == 'in_progress'
+        assert resp.json()['status'] == 'approved'
 
     @patch('apps.complaints.views.notification_service')
     @patch('apps.complaints.views.firestore_service')
@@ -233,9 +234,12 @@ class TestComplaintStatusView:
 
         assert resp.status_code == 200
 
-    def test_resident_cannot_update_status_returns_403(self):
+    @patch('apps.complaints.views.firestore_service')
+    def test_resident_cannot_update_status_returns_403(self, mock_fs):
         token = _make_jwt(str(uuid.uuid4()), 'resident')
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
+        # Provide a complaint so the role check is reached (not a 404)
+        mock_fs.get.return_value = _sample_complaint(cid=self.cid, status='pending')
 
         resp = self.client.patch(
             f'/api/complaints/{self.cid}/status/',
