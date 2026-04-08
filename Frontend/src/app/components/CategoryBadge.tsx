@@ -25,57 +25,57 @@ export function CategoryBadge({ category, className }: CategoryBadgeProps) {
     water: {
       label: 'Water',
       icon: Droplet,
-      className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800',
+      className: 'bg-category-water/10 text-category-water border-category-water/20',
     },
     security: {
       label: 'Security',
       icon: Shield,
-      className: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800',
+      className: 'bg-category-security/10 text-category-security border-category-security/20',
     },
     maintenance: {
       label: 'Maintenance',
       icon: Wrench,
-      className: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800',
+      className: 'bg-category-maintenance/10 text-category-maintenance border-category-maintenance/20',
     },
     electricity: {
       label: 'Electricity',
       icon: Zap,
-      className: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-300 dark:border-yellow-800',
+      className: 'bg-category-electricity/10 text-category-electricity border-category-electricity/20',
     },
     community: {
       label: 'Community',
       icon: Users,
-      className: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800',
+      className: 'bg-category-community/10 text-category-community border-category-community/20',
     },
     infrastructure: {
       label: 'Infrastructure',
       icon: Building2,
-      className: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-950 dark:text-gray-300 dark:border-gray-800',
+      className: 'bg-category-infrastructure/10 text-category-infrastructure border-category-infrastructure/20',
     },
     garden: {
       label: 'Garden',
       icon: Leaf,
-      className: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800',
+      className: 'bg-category-garden/10 text-category-garden border-category-garden/20',
     },
     parking: {
       label: 'Parking',
       icon: Car,
-      className: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800',
+      className: 'bg-category-parking/10 text-category-parking border-category-parking/20',
     },
     noise: {
       label: 'Noise',
       icon: Volume2,
-      className: 'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950 dark:text-pink-300 dark:border-pink-800',
+      className: 'bg-category-noise/10 text-category-noise border-category-noise/20',
     },
     cleanliness: {
       label: 'Cleanliness',
       icon: Sparkles,
-      className: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950 dark:text-teal-300 dark:border-teal-800',
+      className: 'bg-category-cleanliness/10 text-category-cleanliness border-category-cleanliness/20',
     },
     other: {
       label: 'Other',
       icon: MoreHorizontal,
-      className: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-950 dark:text-gray-300 dark:border-gray-800',
+      className: 'bg-category-other/10 text-category-other border-category-other/20',
     },
   };
 

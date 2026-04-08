@@ -86,25 +86,25 @@ const STATUS_ITEMS = [
     value: 'approved',
     label: 'Mark as Approved',
     icon: '✅',
-    className: 'text-blue-600 dark:text-blue-400',
+    className: 'text-status-approved',
   },
   {
     value: 'rejected',
     label: 'Mark as Rejected',
     icon: '❌',
-    className: 'text-destructive',
+    className: 'text-status-rejected',
   },
   {
     value: 'in_progress',
     label: 'Mark as In Progress',
     icon: '⚙️',
-    className: 'text-primary',
+    className: 'text-status-in-progress',
   },
   {
     value: 'resolved',
     label: 'Mark as Resolved',
     icon: '🏁',
-    className: 'text-green-600 dark:text-green-400',
+    className: 'text-status-resolved',
   },
 ];
 

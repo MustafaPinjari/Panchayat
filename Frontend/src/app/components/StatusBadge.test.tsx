@@ -34,18 +34,18 @@ describe('StatusBadge', () => {
     expect(screen.getByText('Pending')).toBeInTheDocument();
   });
 
-  it('renders "Approved" label for approved status with blue color', () => {
+  it('renders "Approved" label for approved status with token-based color', () => {
     const { container } = render(<StatusBadge status="approved" />);
     expect(screen.getByText('Approved')).toBeInTheDocument();
     const span = container.querySelector('span');
-    expect(span?.className).toContain('blue');
+    expect(span?.className).toContain('status-approved');
   });
 
-  it('renders "Assigned" label for assigned status with indigo color', () => {
+  it('renders "Assigned" label for assigned status with token-based color', () => {
     const { container } = render(<StatusBadge status="assigned" />);
     expect(screen.getByText('Assigned')).toBeInTheDocument();
     const span = container.querySelector('span');
-    expect(span?.className).toContain('indigo');
+    expect(span?.className).toContain('status-assigned');
   });
 
   it('renders "In Progress" label for in_progress status', () => {

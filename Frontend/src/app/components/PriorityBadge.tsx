@@ -12,17 +12,17 @@ interface PriorityBadgeProps {
 const config: Record<Priority, { label: string; className: string; icon: React.ReactNode }> = {
   low: {
     label: 'Low',
-    className: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+    className: 'bg-priority-low/10 text-priority-low border-priority-low/20',
     icon: <ArrowDown className="w-3 h-3" />,
   },
   medium: {
     label: 'Medium',
-    className: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
+    className: 'bg-priority-medium/10 text-priority-medium border-priority-medium/20',
     icon: <ArrowUp className="w-3 h-3" />,
   },
   high: {
     label: 'High',
-    className: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
+    className: 'bg-priority-high/10 text-priority-high border-priority-high/20',
     icon: <AlertTriangle className="w-3 h-3" />,
   },
   urgent: {

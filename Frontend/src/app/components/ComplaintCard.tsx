@@ -109,7 +109,7 @@ export function ComplaintCard({
           {(status === 'pending') && onApprove && (
             <button
               onClick={onApprove}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors"
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-status-approved/10 text-status-approved hover:bg-status-approved/20 transition-colors"
             >
               Approve
             </button>
@@ -125,7 +125,7 @@ export function ComplaintCard({
           {(status === 'approved') && onAssign && (
             <button
               onClick={onAssign}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 transition-colors"
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-status-assigned/10 text-status-assigned hover:bg-status-assigned/20 transition-colors"
             >
               Assign
             </button>

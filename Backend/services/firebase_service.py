@@ -53,10 +53,11 @@ class FirestoreService:
         order_by: str | None = None,
         limit: int | None = None,
     ) -> list[dict]:
+        from google.cloud.firestore_v1.base_query import FieldFilter
         ref = _get_db().collection(collection)
         if filters:
             for field, op, value in filters:
-                ref = ref.where(field, op, value)
+                ref = ref.where(filter=FieldFilter(field, op, value))
         if order_by:
             ref = ref.order_by(order_by)
         if limit:

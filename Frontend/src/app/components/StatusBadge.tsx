@@ -12,31 +12,31 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   const statusConfig: Record<string, { label: string; className: string }> = {
     pending: {
       label: 'Pending',
-      className: 'bg-warning/10 text-warning border-warning/20',
+      className: 'bg-status-pending/10 text-status-pending border-status-pending/20',
     },
     approved: {
       label: 'Approved',
-      className: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+      className: 'bg-status-approved/10 text-status-approved border-status-approved/20',
     },
     assigned: {
       label: 'Assigned',
-      className: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20',
+      className: 'bg-status-assigned/10 text-status-assigned border-status-assigned/20',
     },
     'in-progress': {
       label: 'In Progress',
-      className: 'bg-primary/10 text-primary border-primary/20',
+      className: 'bg-status-in-progress/10 text-status-in-progress border-status-in-progress/20',
     },
     in_progress: {
       label: 'In Progress',
-      className: 'bg-primary/10 text-primary border-primary/20',
+      className: 'bg-status-in-progress/10 text-status-in-progress border-status-in-progress/20',
     },
     resolved: {
       label: 'Resolved',
-      className: 'bg-accent/10 text-accent border-accent/20',
+      className: 'bg-status-resolved/10 text-status-resolved border-status-resolved/20',
     },
     rejected: {
       label: 'Rejected',
-      className: 'bg-destructive/10 text-destructive border-destructive/20',
+      className: 'bg-status-rejected/10 text-status-rejected border-status-rejected/20',
     },
   };
 

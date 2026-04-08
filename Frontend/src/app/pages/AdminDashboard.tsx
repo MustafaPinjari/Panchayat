@@ -46,18 +46,33 @@ interface PaginatedResponse<T> {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: '#f59e0b',
-  in_progress: '#4F46E5',
-  resolved: '#10b981',
-  rejected: '#ef4444',
-};
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+const getStatusColors = () => ({
+  pending: getCssVar('--status-pending') || '#F59E0B',
+  in_progress: getCssVar('--status-in-progress') || '#06B6D4',
+  resolved: getCssVar('--status-resolved') || '#10B981',
+  rejected: getCssVar('--status-rejected') || '#EF4444',
+  approved: getCssVar('--status-approved') || '#3B82F6',
+  assigned: getCssVar('--status-assigned') || '#8B5CF6',
+});
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pending',
   in_progress: 'In Progress',
   resolved: 'Resolved',
   rejected: 'Rejected',
+};
+
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  pending: 'bg-status-pending/10 text-status-pending',
+  approved: 'bg-status-approved/10 text-status-approved',
+  assigned: 'bg-status-assigned/10 text-status-assigned',
+  in_progress: 'bg-status-in-progress/10 text-status-in-progress',
+  resolved: 'bg-status-resolved/10 text-status-resolved',
+  rejected: 'bg-status-rejected/10 text-status-rejected',
 };
 
 function capitalize(s: string): string {
@@ -92,25 +107,32 @@ function buildTrendData(complaints: Complaint[]): { day: string; submitted: numb
 
 // ── StatCard ─────────────────────────────────────────────────────────────────
 
+const STAT_VARIANTS = {
+  primary: 'bg-primary/10 text-primary',
+  warning: 'bg-status-pending/10 text-status-pending',
+  info: 'bg-status-in-progress/10 text-status-in-progress',
+  success: 'bg-status-resolved/10 text-status-resolved',
+};
+
 const StatCard = ({
   title,
   value,
   icon: Icon,
   trend,
-  color,
+  variant,
 }: {
   title: string;
   value: string | number;
   icon: any;
   trend?: string;
-  color: string;
+  variant: 'primary' | 'warning' | 'info' | 'success';
 }) => (
   <div className="bg-card border border-border rounded-xl p-6 hover:shadow-lg transition-shadow">
     <div className="flex items-start justify-between mb-4">
       <div
-        className={`w-12 h-12 rounded-xl flex items-center justify-center bg-${color}/10`}
+        className={`w-12 h-12 rounded-xl flex items-center justify-center ${STAT_VARIANTS[variant]}`}
       >
-        <Icon className={`w-6 h-6 text-${color}`} style={{ color }} />
+        <Icon className="w-6 h-6" />
       </div>
       {trend && (
         <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -161,11 +183,12 @@ export default function AdminDashboard() {
     fetchData();
   }, []);
 
+  const statusColors = getStatusColors();
   const statusData = analytics
     ? Object.entries(analytics.by_status).map(([key, value]) => ({
         name: STATUS_LABELS[key] ?? capitalize(key),
         value,
-        color: STATUS_COLORS[key] ?? '#94a3b8',
+        color: statusColors[key as keyof ReturnType<typeof getStatusColors>] ?? (getCssVar('--muted-foreground') || '#94a3b8'),
       }))
     : [];
 
@@ -197,25 +220,25 @@ export default function AdminDashboard() {
               title="Total Complaints"
               value={analytics?.total ?? '—'}
               icon={AlertCircle}
-              color="#4F46E5"
+              variant="primary"
             />
             <StatCard
               title="Pending"
               value={analytics?.by_status?.pending ?? '—'}
               icon={Clock}
-              color="#f59e0b"
+              variant="warning"
             />
             <StatCard
               title="In Progress"
               value={analytics?.by_status?.in_progress ?? '—'}
               icon={TrendingUp}
-              color="#4F46E5"
+              variant="info"
             />
             <StatCard
               title="Resolved"
               value={analytics?.by_status?.resolved ?? '—'}
               icon={CheckCircle}
-              color="#10b981"
+              variant="success"
             />
           </div>
 
@@ -229,17 +252,17 @@ export default function AdminDashboard() {
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={categoryData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#64748b" />
-                    <YAxis tick={{ fontSize: 12 }} stroke="#64748b" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={getCssVar('--border')} />
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke={getCssVar('--muted-foreground')} />
+                    <YAxis tick={{ fontSize: 12 }} stroke={getCssVar('--muted-foreground')} />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #e2e8f0',
+                        backgroundColor: getCssVar('--card'),
+                        border: `1px solid ${getCssVar('--border')}`,
                         borderRadius: '8px',
                       }}
                     />
-                    <Bar dataKey="count" fill="#4F46E5" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="count" fill={getCssVar('--primary')} radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -262,7 +285,7 @@ export default function AdminDashboard() {
                         `${name} ${(percent * 100).toFixed(0)}%`
                       }
                       outerRadius={100}
-                      fill="#8884d8"
+                      fill={getCssVar('--primary') || '#1D3557'}
                       dataKey="value"
                     >
                       {statusData.map((entry, index) => (
@@ -284,13 +307,13 @@ export default function AdminDashboard() {
             ) : (
               <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={trendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="#64748b" />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="#64748b" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={getCssVar('--border')} />
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke={getCssVar('--muted-foreground')} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke={getCssVar('--muted-foreground')} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e2e8f0',
+                      backgroundColor: getCssVar('--card'),
+                      border: `1px solid ${getCssVar('--border')}`,
                       borderRadius: '8px',
                     }}
                   />
@@ -298,7 +321,7 @@ export default function AdminDashboard() {
                   <Line
                     type="monotone"
                     dataKey="submitted"
-                    stroke="#4F46E5"
+                    stroke={getCssVar('--primary')}
                     strokeWidth={2}
                     dot={{ r: 4 }}
                     activeDot={{ r: 6 }}
@@ -307,7 +330,7 @@ export default function AdminDashboard() {
                   <Line
                     type="monotone"
                     dataKey="resolved"
-                    stroke="#10b981"
+                    stroke={getCssVar('--status-resolved')}
                     strokeWidth={2}
                     dot={{ r: 4 }}
                     activeDot={{ r: 6 }}
@@ -349,15 +372,7 @@ export default function AdminDashboard() {
                         <td className="p-4 text-sm">{capitalize(complaint.category)}</td>
                         <td className="p-4 text-sm">
                           <span
-                            className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                              complaint.status === 'pending'
-                                ? 'bg-warning/10 text-warning'
-                                : complaint.status === 'in_progress'
-                                ? 'bg-primary/10 text-primary'
-                                : complaint.status === 'resolved'
-                                ? 'bg-accent/10 text-accent'
-                                : 'bg-destructive/10 text-destructive'
-                            }`}
+                            className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${STATUS_BADGE_CLASSES[complaint.status] ?? STATUS_BADGE_CLASSES.pending}`}
                           >
                             {STATUS_LABELS[complaint.status] ?? capitalize(complaint.status)}
                           </span>
