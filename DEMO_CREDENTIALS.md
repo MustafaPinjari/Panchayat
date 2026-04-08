@@ -38,3 +38,13 @@ Access: complaints management, resident communication, notices.
 - Flat: C-02
 
 Access: submit complaints, view notices, chat, notifications.
+
+---
+
+## Property Manager
+
+- Email: `manager@societyhub.com`
+- Password: `Manager@123`
+- Flat: D-03
+
+Access: assigned tasks dashboard, start/resolve complaints, notifications.

@@ -8,11 +8,18 @@ interface ComplaintCardProps {
   id: string;
   title: string;
   category: string;
-  status: 'pending' | 'in-progress' | 'in_progress' | 'resolved' | 'rejected';
+  status: 'pending' | 'approved' | 'assigned' | 'in-progress' | 'in_progress' | 'resolved' | 'rejected';
   timestamp: string;
   isAnonymous?: boolean;
   author?: string;
   replies?: number;
+  assignedManager?: string;
+  userRole?: 'resident' | 'committee_member' | 'admin' | 'manager';
+  onApprove?: () => void;
+  onReject?: () => void;
+  onAssign?: () => void;
+  onStart?: () => void;
+  onResolve?: () => void;
   onClick?: () => void;
 }
 
@@ -25,8 +32,18 @@ export function ComplaintCard({
   isAnonymous = false,
   author,
   replies = 0,
+  assignedManager,
+  userRole,
+  onApprove,
+  onReject,
+  onAssign,
+  onStart,
+  onResolve,
   onClick,
 }: ComplaintCardProps) {
+  const showCommitteeActions = userRole === 'committee_member' || userRole === 'admin';
+  const showManagerActions = userRole === 'manager';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -47,6 +64,11 @@ export function ComplaintCard({
             <Clock className="w-3 h-3" />
             <span>{timestamp}</span>
           </div>
+          {assignedManager && (
+            <div className="mt-1 text-xs text-muted-foreground">
+              Assigned to: <span className="font-medium text-foreground">{assignedManager}</span>
+            </div>
+          )}
         </div>
         <StatusBadge status={status} />
       </div>
@@ -60,6 +82,56 @@ export function ComplaintCard({
           </div>
         )}
       </div>
+
+      {showCommitteeActions && (
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border" onClick={(e) => e.stopPropagation()}>
+          {(status === 'pending') && onApprove && (
+            <button
+              onClick={onApprove}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors"
+            >
+              Approve
+            </button>
+          )}
+          {(status === 'pending') && onReject && (
+            <button
+              onClick={onReject}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+            >
+              Reject
+            </button>
+          )}
+          {(status === 'approved') && onAssign && (
+            <button
+              onClick={onAssign}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 transition-colors"
+            >
+              Assign
+            </button>
+          )}
+        </div>
+      )}
+
+      {showManagerActions && (
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border" onClick={(e) => e.stopPropagation()}>
+          {status === 'assigned' && onStart && (
+            <button
+              onClick={onStart}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              Start
+            </button>
+          )}
+          {status === 'in_progress' && onResolve && (
+            <button
+              onClick={onResolve}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+            >
+              Resolve
+            </button>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }

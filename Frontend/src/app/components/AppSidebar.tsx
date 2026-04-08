@@ -8,6 +8,7 @@ import {
   Settings,
   Bell,
   Building2,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from './ui/utils';
 import { useAuth } from '../../context/AuthContext';
@@ -33,7 +34,17 @@ export function AppSidebar() {
     { to: '/settings', icon: Settings, label: 'Settings' },
   ];
 
-  const links = userRole === 'admin' ? adminLinks : residentLinks;
+  const managerLinks = [
+    { to: '/dashboard', icon: Home, label: 'Dashboard' },
+    { to: '/manager', icon: ClipboardList, label: 'My Tasks' },
+    { to: '/notifications', icon: Bell, label: 'Notifications' },
+    { to: '/settings', icon: Settings, label: 'Settings' },
+  ];
+
+  const links =
+    userRole === 'admin' ? adminLinks :
+    userRole === 'manager' ? managerLinks :
+    residentLinks;
 
   const displayName = user?.name || (userRole === 'admin' ? 'Admin User' : 'Resident User');
   const initials = displayName
@@ -53,7 +64,7 @@ export function AppSidebar() {
           <div>
             <h1 className="font-semibold text-sidebar-foreground">Society Hub</h1>
             <p className="text-xs text-muted-foreground capitalize">
-              {userRole === 'committee_member' ? 'Committee Member' : userRole}
+              {userRole === 'committee_member' ? 'Committee Member' : userRole === 'manager' ? 'Property Manager' : userRole}
             </p>
           </div>
         </div>

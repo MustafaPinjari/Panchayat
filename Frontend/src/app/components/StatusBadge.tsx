@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from './ui/utils';
 
-type Status = 'pending' | 'in-progress' | 'in_progress' | 'resolved' | 'rejected';
+type Status = 'pending' | 'approved' | 'assigned' | 'in-progress' | 'in_progress' | 'resolved' | 'rejected';
 
 interface StatusBadgeProps {
   status: Status;
@@ -13,6 +13,14 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
     pending: {
       label: 'Pending',
       className: 'bg-warning/10 text-warning border-warning/20',
+    },
+    approved: {
+      label: 'Approved',
+      className: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+    },
+    assigned: {
+      label: 'Assigned',
+      className: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20',
     },
     'in-progress': {
       label: 'In Progress',

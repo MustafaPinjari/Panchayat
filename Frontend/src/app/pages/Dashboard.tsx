@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router';
 import { TopNav } from '../components/TopNav';
 import { ComplaintCard } from '../components/ComplaintCard';
 import { FAB } from '../components/FAB';
-import { Mic, RefreshCw } from 'lucide-react';
+import { Mic, RefreshCw, X } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { api } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { toast } from 'sonner';
 
 interface Complaint {
   id: string;
@@ -15,8 +17,16 @@ interface Complaint {
   created_by?: string;
   anonymous: boolean;
   category: string;
-  status: 'pending' | 'in_progress' | 'resolved';
+  status: 'pending' | 'approved' | 'assigned' | 'in_progress' | 'resolved' | 'rejected';
   created_at: string;
+  assigned_to?: string | null;
+  approved_by?: string | null;
+}
+
+interface Manager {
+  id: string;
+  name: string;
+  email: string;
 }
 
 interface PaginatedResponse<T> {
@@ -53,8 +63,104 @@ function SkeletonCard() {
   );
 }
 
+// ── Assign Modal ─────────────────────────────────────────────────────────────
+
+function AssignModal({
+  complaintId,
+  onClose,
+  onAssigned,
+}: {
+  complaintId: string;
+  onClose: () => void;
+  onAssigned: (complaintId: string) => void;
+}) {
+  const [managers, setManagers] = useState<Manager[]>([]);
+  const [loadingManagers, setLoadingManagers] = useState(true);
+  const [selectedId, setSelectedId] = useState('');
+  const [assigning, setAssigning] = useState(false);
+
+  useEffect(() => {
+    api.get<PaginatedResponse<Manager>>('/api/users/?role=manager')
+      .then((data) => setManagers(data.results ?? []))
+      .catch(() => toast.error('Could not load managers'))
+      .finally(() => setLoadingManagers(false));
+  }, []);
+
+  const handleAssign = async () => {
+    if (!selectedId) return;
+    setAssigning(true);
+    try {
+      await api.patch(`/api/complaints/${complaintId}/assign/`, { manager_id: selectedId });
+      toast.success('Complaint assigned successfully');
+      onAssigned(complaintId);
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Assignment failed');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Assign to Manager</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {loadingManagers ? (
+          <div className="space-y-2">
+            <div className="h-10 bg-muted rounded animate-pulse" />
+            <div className="h-10 bg-muted rounded animate-pulse" />
+          </div>
+        ) : managers.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No property managers found. Register a manager account first.
+          </p>
+        ) : (
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {managers.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setSelectedId(m.id)}
+                className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
+                  selectedId === m.id
+                    ? 'border-primary bg-primary/5 text-primary'
+                    : 'border-border hover:bg-muted'
+                }`}
+              >
+                <p className="font-medium text-sm">{m.name}</p>
+                <p className="text-xs text-muted-foreground">{m.email}</p>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-2">
+          <Button variant="outline" className="flex-1" onClick={onClose} disabled={assigning}>
+            Cancel
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={handleAssign}
+            disabled={!selectedId || assigning || loadingManagers}
+          >
+            {assigning ? 'Assigning...' : 'Assign'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('all');
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [nextUrl, setNextUrl] = useState<string | null>(null);
@@ -62,11 +168,13 @@ export default function Dashboard() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [assigningComplaintId, setAssigningComplaintId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isCommitteeOrAdmin = user?.role === 'committee_member' || user?.role === 'admin';
 
   const buildPath = useCallback((tab: string, search: string, pageUrl?: string | null) => {
     if (pageUrl) {
-      // Strip the base URL from the next URL — api.ts prepends it
       try {
         const url = new URL(pageUrl);
         return url.pathname + url.search;
@@ -113,19 +221,29 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch when tab changes
   useEffect(() => {
     fetchComplaints(activeTab, searchQuery);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  // Debounced search
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchComplaints(activeTab, query);
     }, 300);
+  };
+
+  const updateComplaintStatus = async (id: string, newStatus: string) => {
+    try {
+      await api.patch(`/api/complaints/${id}/status/`, { status: newStatus });
+      setComplaints((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status: newStatus as Complaint['status'] } : c))
+      );
+      toast.success(`Complaint ${newStatus}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update status');
+    }
   };
 
   return (
@@ -144,12 +262,13 @@ export default function Dashboard() {
           <TabsList className="w-full md:w-auto">
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="pending">Pending</TabsTrigger>
+            <TabsTrigger value="approved">Approved</TabsTrigger>
+            <TabsTrigger value="assigned">Assigned</TabsTrigger>
             <TabsTrigger value="in_progress">In Progress</TabsTrigger>
             <TabsTrigger value="resolved">Resolved</TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {/* Loading skeleton */}
         {loading && (
           <div className="space-y-4">
             <SkeletonCard />
@@ -158,7 +277,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Error state */}
         {!loading && error && (
           <div className="flex flex-col items-center justify-center py-12 gap-4">
             <p className="text-destructive text-sm">{error}</p>
@@ -174,7 +292,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Complaint list */}
         {!loading && !error && (
           <div className="space-y-4">
             {complaints.length > 0 ? (
@@ -188,6 +305,22 @@ export default function Dashboard() {
                   timestamp={formatTimestamp(complaint.created_at)}
                   isAnonymous={complaint.anonymous}
                   author={complaint.created_by}
+                  userRole={user?.role}
+                  onApprove={
+                    isCommitteeOrAdmin && complaint.status === 'pending'
+                      ? () => updateComplaintStatus(complaint.id, 'approved')
+                      : undefined
+                  }
+                  onReject={
+                    isCommitteeOrAdmin && complaint.status === 'pending'
+                      ? () => updateComplaintStatus(complaint.id, 'rejected')
+                      : undefined
+                  }
+                  onAssign={
+                    isCommitteeOrAdmin && complaint.status === 'approved'
+                      ? () => setAssigningComplaintId(complaint.id)
+                      : undefined
+                  }
                   onClick={() => navigate(`/complaint/${complaint.id}`)}
                 />
               ))
@@ -197,7 +330,6 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Load more */}
             {nextUrl && (
               <div className="flex justify-center pt-2">
                 <Button
@@ -219,6 +351,18 @@ export default function Dashboard() {
         icon={<Mic className="w-5 h-5" />}
         label="Report Issue"
       />
+
+      {assigningComplaintId && (
+        <AssignModal
+          complaintId={assigningComplaintId}
+          onClose={() => setAssigningComplaintId(null)}
+          onAssigned={(id) =>
+            setComplaints((prev) =>
+              prev.map((c) => (c.id === id ? { ...c, status: 'assigned' } : c))
+            )
+          }
+        />
+      )}
     </div>
   );
 }

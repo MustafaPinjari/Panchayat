@@ -24,8 +24,11 @@ interface Complaint {
   created_by?: string;
   anonymous: boolean;
   category: string;
-  status: 'pending' | 'in_progress' | 'resolved';
+  status: 'pending' | 'approved' | 'assigned' | 'in_progress' | 'resolved' | 'rejected';
   created_at: string;
+  assigned_to?: string | null;
+  approved_by?: string | null;
+  resolved_at?: string | null;
 }
 
 interface Comment {
@@ -63,28 +66,42 @@ function ComplaintSkeleton() {
 
 const STATUS_ITEMS = [
   {
-    value: 'pending',
-    label: 'Mark as Pending',
-    icon: '🕐',
-    className: 'text-yellow-600 dark:text-yellow-400',
+    value: 'approved',
+    label: 'Mark as Approved',
+    icon: '✅',
+    className: 'text-blue-600 dark:text-blue-400',
+    roles: ['committee_member', 'admin'],
+  },
+  {
+    value: 'rejected',
+    label: 'Mark as Rejected',
+    icon: '❌',
+    className: 'text-destructive',
+    roles: ['committee_member', 'admin'],
   },
   {
     value: 'in_progress',
     label: 'Mark as In Progress',
     icon: '⚙️',
-    className: 'text-blue-600 dark:text-blue-400',
+    className: 'text-primary',
+    roles: ['manager', 'admin'],
   },
   {
     value: 'resolved',
     label: 'Mark as Resolved',
-    icon: '✅',
+    icon: '🏁',
     className: 'text-green-600 dark:text-green-400',
+    roles: ['manager', 'admin'],
   },
 ];
 
-function StatusDropdown({ onSelect, disabled }: { onSelect: (s: string) => void; disabled: boolean }) {
+function StatusDropdown({ onSelect, disabled, userRole }: { onSelect: (s: string) => void; disabled: boolean; userRole?: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  const visibleItems = STATUS_ITEMS.filter(
+    (item) => !userRole || item.roles.includes(userRole)
+  );
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -93,6 +110,8 @@ function StatusDropdown({ onSelect, disabled }: { onSelect: (s: string) => void;
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  if (visibleItems.length === 0) return null;
 
   return (
     <div ref={ref} className="relative">
@@ -116,7 +135,7 @@ function StatusDropdown({ onSelect, disabled }: { onSelect: (s: string) => void;
             Update Status
           </p>
           <div className="p-1">
-            {STATUS_ITEMS.map((item) => (
+            {visibleItems.map((item) => (
               <button
                 key={item.value}
                 className={`w-full text-left px-3 py-2.5 text-sm rounded-lg flex items-center gap-3 transition-colors hover:bg-muted ${item.className}`}
@@ -149,7 +168,7 @@ export default function ComplaintDetail() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const canChangeStatus =
-    user?.role === 'committee_member' || user?.role === 'admin';
+    user?.role === 'committee_member' || user?.role === 'admin' || user?.role === 'manager';
 
   useEffect(() => {
     if (!id) return;
@@ -279,6 +298,7 @@ export default function ComplaintDetail() {
                   <StatusDropdown
                     onSelect={handleStatusChange}
                     disabled={updatingStatus}
+                    userRole={user?.role}
                   />
                 )}
               </div>

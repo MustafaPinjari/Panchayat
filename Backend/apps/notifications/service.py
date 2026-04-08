@@ -45,5 +45,15 @@ class NotificationService:
         except Exception as exc:
             logger.error('Failed to notify admins/committee: %s', exc)
 
+    def notify_manager_assigned(self, manager_id: str, complaint_id: str, complaint_text: str) -> None:
+        """Notify a manager that a complaint has been assigned to them."""
+        summary = complaint_text[:100]
+        message = f'Complaint {complaint_id} has been assigned to you: {summary}'
+        self.create_notification(manager_id, message)
+
+    def notify_property_manager(self, manager_id: str, message: str) -> None:
+        """Notify a specific property manager by user_id."""
+        self.create_notification(manager_id, message)
+
 
 notification_service = NotificationService()

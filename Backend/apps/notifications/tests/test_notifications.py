@@ -144,3 +144,102 @@ class TestNotificationReadView:
         self.client.credentials()
         resp = self.client.patch(f'/api/notifications/{uuid.uuid4()}/read/')
         assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# NotificationService tests
+# ---------------------------------------------------------------------------
+
+class TestNotificationService:
+    """Tests for NotificationService helper methods."""
+
+    @patch('apps.notifications.service.firestore_service')
+    def test_notify_manager_assigned_creates_notification(self, mock_fs):
+        """notify_manager_assigned should create a notification with complaint summary."""
+        from apps.notifications.service import NotificationService
+
+        service = NotificationService()
+        manager_id = str(uuid.uuid4())
+        complaint_id = str(uuid.uuid4())
+        complaint_text = 'This is a test complaint with more than 100 characters. ' * 3
+
+        service.notify_manager_assigned(manager_id, complaint_id, complaint_text)
+
+        mock_fs.set.assert_called_once()
+        call_args = mock_fs.set.call_args
+        assert call_args[0][0] == 'notifications'
+        notif_data = call_args[0][2]
+        assert notif_data['user_id'] == manager_id
+        assert complaint_id in notif_data['message']
+        assert len(notif_data['message']) <= 200  # ID + summary should be reasonable length
+
+    @patch('apps.notifications.service.firestore_service')
+    def test_notify_manager_assigned_truncates_long_text(self, mock_fs):
+        """notify_manager_assigned should truncate complaint text to 100 chars."""
+        from apps.notifications.service import NotificationService
+
+        service = NotificationService()
+        manager_id = str(uuid.uuid4())
+        complaint_id = str(uuid.uuid4())
+        complaint_text = 'A' * 200  # Long text
+
+        service.notify_manager_assigned(manager_id, complaint_id, complaint_text)
+
+        call_args = mock_fs.set.call_args
+        notif_data = call_args[0][2]
+        # The summary should be exactly 100 chars of the complaint text
+        assert 'A' * 100 in notif_data['message']
+        assert 'A' * 101 not in notif_data['message']
+
+    @patch('apps.notifications.service.firestore_service')
+    def test_notify_manager_assigned_handles_short_text(self, mock_fs):
+        """notify_manager_assigned should handle complaint text shorter than 100 chars."""
+        from apps.notifications.service import NotificationService
+
+        service = NotificationService()
+        manager_id = str(uuid.uuid4())
+        complaint_id = str(uuid.uuid4())
+        complaint_text = 'Short complaint'
+
+        service.notify_manager_assigned(manager_id, complaint_id, complaint_text)
+
+        call_args = mock_fs.set.call_args
+        notif_data = call_args[0][2]
+        assert 'Short complaint' in notif_data['message']
+        assert complaint_id in notif_data['message']
+
+    @patch('apps.notifications.service.firestore_service')
+    def test_notify_property_manager_creates_notification(self, mock_fs):
+        """notify_property_manager should create a notification with the given message."""
+        from apps.notifications.service import NotificationService
+
+        service = NotificationService()
+        manager_id = str(uuid.uuid4())
+        message = 'Complaint status updated to resolved'
+
+        service.notify_property_manager(manager_id, message)
+
+        mock_fs.set.assert_called_once()
+        call_args = mock_fs.set.call_args
+        assert call_args[0][0] == 'notifications'
+        notif_data = call_args[0][2]
+        assert notif_data['user_id'] == manager_id
+        assert notif_data['message'] == message
+        assert notif_data['read_status'] is False
+
+    @patch('apps.notifications.service.firestore_service')
+    def test_notify_property_manager_with_empty_message(self, mock_fs):
+        """notify_property_manager should handle empty messages."""
+        from apps.notifications.service import NotificationService
+
+        service = NotificationService()
+        manager_id = str(uuid.uuid4())
+        message = ''
+
+        service.notify_property_manager(manager_id, message)
+
+        mock_fs.set.assert_called_once()
+        call_args = mock_fs.set.call_args
+        notif_data = call_args[0][2]
+        assert notif_data['user_id'] == manager_id
+        assert notif_data['message'] == ''

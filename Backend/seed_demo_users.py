@@ -32,6 +32,14 @@ DEMO_USERS = [
         "role": "resident",
         "flat_number": "C-02",
     },
+    {
+        "name": "Property Manager",
+        "email": "manager@societyhub.com",
+        "password": "Manager@123",
+        "phone": "9000000004",
+        "role": "manager",
+        "flat_number": "D-03",
+    },
 ]
 
 for user in DEMO_USERS:

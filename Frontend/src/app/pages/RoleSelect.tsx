@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router';
-import { Building2, Users, Shield, UserCheck } from 'lucide-react';
+import { Building2, Users, Shield, UserCheck, ClipboardList } from 'lucide-react';
 import { motion } from 'motion/react';
 
 const roles = [
@@ -14,6 +14,12 @@ const roles = [
     label: 'Committee Member',
     description: 'Manage complaints and communicate with residents',
     icon: UserCheck,
+  },
+  {
+    key: 'manager',
+    label: 'Property Manager',
+    description: 'View and resolve complaints assigned to you',
+    icon: ClipboardList,
   },
   {
     key: 'admin',

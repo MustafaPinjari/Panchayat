@@ -11,6 +11,7 @@ import UserManagement from './pages/UserManagement';
 import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
 import ComplaintDetail from './pages/ComplaintDetail';
+import ManagerDashboard from './pages/ManagerDashboard';
 
 export const router = createBrowserRouter([
   {
@@ -44,6 +45,10 @@ export const router = createBrowserRouter([
       {
         path: 'admin',
         element: <ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>,
+      },
+      {
+        path: 'manager',
+        element: <ProtectedRoute roles={['manager', 'admin']}><ManagerDashboard /></ProtectedRoute>,
       },
       {
         path: 'users',

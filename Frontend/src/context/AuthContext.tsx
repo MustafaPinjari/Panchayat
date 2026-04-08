@@ -5,7 +5,7 @@ import { api } from '../services/api';
 export interface AuthUser {
   id: number;
   email: string;
-  role: 'resident' | 'committee_member' | 'admin';
+  role: 'resident' | 'committee_member' | 'admin' | 'manager';
   name: string;
 }
 
