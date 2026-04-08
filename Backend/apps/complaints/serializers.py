@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 VALID_CATEGORIES = ('water', 'security', 'maintenance', 'noise', 'cleanliness', 'other')
 VALID_STATUSES = ('pending', 'approved', 'assigned', 'in_progress', 'resolved', 'rejected')
+VALID_PRIORITIES = ('low', 'medium', 'high', 'urgent')
 
 
 class ComplaintSerializer(serializers.Serializer):
@@ -18,6 +19,7 @@ class ComplaintSerializer(serializers.Serializer):
     anonymous = serializers.BooleanField(default=False)
     category = serializers.ChoiceField(choices=VALID_CATEGORIES)
     status = serializers.ChoiceField(choices=VALID_STATUSES, default='pending')
+    priority = serializers.ChoiceField(choices=VALID_PRIORITIES, default='medium', required=False)
     created_at = serializers.CharField(read_only=True)
     # New fields — read-only, nullable, backward-compatible
     assigned_to = serializers.CharField(read_only=True, allow_null=True, required=False, default=None)
@@ -37,6 +39,9 @@ class ComplaintSerializer(serializers.Serializer):
         for field in ('assigned_to', 'approved_by', 'resolved_at'):
             if field not in instance:
                 data[field] = None
+        # Backward compatibility: default priority for legacy documents
+        if 'priority' not in instance:
+            data['priority'] = 'medium'
         return data
 
 

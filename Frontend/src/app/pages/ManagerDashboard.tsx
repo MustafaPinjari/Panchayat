@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TopNav } from '../components/TopNav';
 import { ComplaintCard } from '../components/ComplaintCard';
 import { Button } from '../components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Search } from 'lucide-react';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 
@@ -17,6 +17,7 @@ interface Complaint {
   category: string;
   status: 'pending' | 'approved' | 'assigned' | 'in_progress' | 'resolved' | 'rejected';
   created_at: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
   assigned_to?: string | null;
   approved_by?: string | null;
   resolved_at?: string | null;
@@ -66,7 +67,8 @@ export default function ManagerDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Track in-flight PATCH requests per complaint ID to prevent double-submission
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'assigned' | 'in_progress'>('all');
   const [inFlight, setInFlight] = useState<Set<string>>(new Set());
 
   const fetchTasks = useCallback(async () => {
@@ -146,9 +148,37 @@ export default function ManagerDashboard() {
       <main className="flex-1 p-4 md:p-6 max-w-4xl mx-auto w-full">
         <div className="mb-6">
           <h2 className="text-2xl font-semibold mb-2">Assigned Tasks</h2>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-4">
             Complaints assigned to you — start work or mark them resolved.
           </p>
+          {/* Search + filter */}
+          <div className="flex gap-2 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search tasks…"
+                className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div className="flex gap-1">
+              {(['all', 'assigned', 'in_progress'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setStatusFilter(f)}
+                  className={`px-3 py-2 text-xs font-medium rounded-lg border transition-colors ${
+                    statusFilter === f
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background border-border hover:bg-muted'
+                  }`}
+                >
+                  {f === 'all' ? 'All' : f === 'assigned' ? 'Assigned' : 'In Progress'}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Loading skeleton */}
@@ -179,37 +209,46 @@ export default function ManagerDashboard() {
         {/* Task list */}
         {!loading && !error && (
           <div className="space-y-4">
-            {complaints.length > 0 ? (
-              complaints.map((complaint) => (
-                <ComplaintCard
-                  key={complaint.id}
-                  id={complaint.id}
-                  title={complaint.text}
-                  category={complaint.category}
-                  status={complaint.status}
-                  timestamp={formatTimestamp(complaint.created_at)}
-                  isAnonymous={complaint.anonymous}
-                  author={complaint.created_by}
-                  userRole="manager"
-                  onStart={
-                    complaint.status === 'assigned' && !inFlight.has(complaint.id)
-                      ? () => updateStatus(complaint.id, 'in_progress')
-                      : undefined
-                  }
-                  onResolve={
-                    complaint.status === 'in_progress' && !inFlight.has(complaint.id)
-                      ? () => updateStatus(complaint.id, 'resolved')
-                      : undefined
-                  }
-                />
-              ))
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No tasks assigned to you yet.</p>
-              </div>
-            )}
+            {(() => {
+              const filtered = complaints
+                .filter((c) => statusFilter === 'all' || c.status === statusFilter)
+                .filter((c) => !search || c.text.toLowerCase().includes(search.toLowerCase()) || c.category.toLowerCase().includes(search.toLowerCase()));
+              return filtered.length > 0 ? (
+                filtered.map((complaint) => (
+                  <ComplaintCard
+                    key={complaint.id}
+                    id={complaint.id}
+                    title={complaint.text}
+                    category={complaint.category}
+                    status={complaint.status}
+                    timestamp={formatTimestamp(complaint.created_at)}
+                    createdAt={complaint.created_at}
+                    priority={complaint.priority}
+                    isAnonymous={complaint.anonymous}
+                    author={complaint.created_by}
+                    userRole="manager"
+                    onStart={
+                      complaint.status === 'assigned' && !inFlight.has(complaint.id)
+                        ? () => updateStatus(complaint.id, 'in_progress')
+                        : undefined
+                    }
+                    onResolve={
+                      complaint.status === 'in_progress' && !inFlight.has(complaint.id)
+                        ? () => updateStatus(complaint.id, 'resolved')
+                        : undefined
+                    }
+                  />
+                ))
+              ) : (
+                <div className="text-center py-12 space-y-2">
+                  <Search className="w-10 h-10 text-muted-foreground mx-auto opacity-40" />
+                  <p className="text-muted-foreground">
+                    {search || statusFilter !== 'all' ? 'No tasks match your filter.' : 'No tasks assigned to you yet.'}
+                  </p>
+                </div>
+              );
+            })()}
 
-            {/* Load more */}
             {nextUrl && (
               <div className="flex justify-center pt-2">
                 <Button

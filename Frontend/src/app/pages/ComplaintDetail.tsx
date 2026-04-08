@@ -64,44 +64,65 @@ function ComplaintSkeleton() {
   );
 }
 
+// Valid next transitions per role and current status
+const VALID_TRANSITIONS: Record<string, Record<string, string[]>> = {
+  committee_member: {
+    pending: ['approved', 'rejected'],
+  },
+  admin: {
+    pending: ['approved', 'rejected'],
+    approved: ['assigned'],
+    assigned: ['in_progress'],
+    in_progress: ['resolved'],
+  },
+  manager: {
+    assigned: ['in_progress'],
+    in_progress: ['resolved'],
+  },
+};
+
 const STATUS_ITEMS = [
   {
     value: 'approved',
     label: 'Mark as Approved',
     icon: '✅',
     className: 'text-blue-600 dark:text-blue-400',
-    roles: ['committee_member', 'admin'],
   },
   {
     value: 'rejected',
     label: 'Mark as Rejected',
     icon: '❌',
     className: 'text-destructive',
-    roles: ['committee_member', 'admin'],
   },
   {
     value: 'in_progress',
     label: 'Mark as In Progress',
     icon: '⚙️',
     className: 'text-primary',
-    roles: ['manager', 'admin'],
   },
   {
     value: 'resolved',
     label: 'Mark as Resolved',
     icon: '🏁',
     className: 'text-green-600 dark:text-green-400',
-    roles: ['manager', 'admin'],
   },
 ];
 
-function StatusDropdown({ onSelect, disabled, userRole }: { onSelect: (s: string) => void; disabled: boolean; userRole?: string }) {
+function StatusDropdown({ onSelect, disabled, userRole, currentStatus }: {
+  onSelect: (s: string) => void;
+  disabled: boolean;
+  userRole?: string;
+  currentStatus?: string;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const visibleItems = STATUS_ITEMS.filter(
-    (item) => !userRole || item.roles.includes(userRole)
-  );
+  // Only show transitions valid for this role + current status
+  const allowedNext = userRole && currentStatus
+    ? (VALID_TRANSITIONS[userRole]?.[currentStatus] ?? [])
+    : [];
+
+  const visibleItems = STATUS_ITEMS.filter((item) => allowedNext.includes(item.value));
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -299,6 +320,7 @@ export default function ComplaintDetail() {
                     onSelect={handleStatusChange}
                     disabled={updatingStatus}
                     userRole={user?.role}
+                    currentStatus={complaint.status}
                   />
                 )}
               </div>

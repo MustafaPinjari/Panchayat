@@ -50,12 +50,17 @@ export default function VoiceComplaint() {
   const [transcribedText, setTranscribedText] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [category, setCategory] = useState<string>('');
+  const [priority, setPriority] = useState<string>('medium');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(true);
+  const [isCategorizingAI, setIsCategorizingAI] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-  const interimRef = useRef<string>('');
+  const finalTextRef = useRef<string>('');
+  const isStoppingRef = useRef<boolean>(false);
+  const restartCountRef = useRef<number>(0); // guard against infinite restart loops
+  const MAX_RESTARTS = 20;
 
   useEffect(() => {
     const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
@@ -73,53 +78,98 @@ export default function VoiceComplaint() {
       return;
     }
 
-    const recognition = new SR();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
-    recognitionRef.current = recognition;
-    interimRef.current = '';
+    // Reset accumulators
+    finalTextRef.current = '';
+    isStoppingRef.current = false;
+    restartCountRef.current = 0;
+    setTranscribedText('');
 
-    recognition.onresult = (e: SpeechRecognitionEvent) => {
-      let final = '';
-      let interim = '';
-      for (let i = 0; i < e.results.length; i++) {
-        const result = e.results[i];
-        if (result.isFinal) {
-          final += result[0].transcript + ' ';
-        } else {
-          interim += result[0].transcript;
+    const startSession = () => {
+      const recognition = new SR();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      recognitionRef.current = recognition;
+
+      recognition.onresult = (e: SpeechRecognitionEvent) => {
+        // Collect newly finalized results from this event batch
+        let newFinal = '';
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const result = e.results[i];
+          if (result.isFinal) {
+            newFinal += result[0].transcript;
+          } else {
+            interim += result[0].transcript;
+          }
         }
-      }
-      setTranscribedText(final + interim);
-      interimRef.current = interim;
+        if (newFinal) {
+          finalTextRef.current += (finalTextRef.current ? ' ' : '') + newFinal.trim();
+        }
+        // Show accumulated final + current interim
+        const display = finalTextRef.current + (interim ? ' ' + interim : '');
+        setTranscribedText(display.trim());
+      };
+
+      recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
+        if (e.error === 'not-allowed') {
+          setPermissionError('Microphone access was denied. Please allow microphone access in your browser settings.');
+          setRecordingState('idle');
+        } else if (e.error === 'no-speech' || e.error === 'aborted') {
+          // ignore — will auto-restart via onend
+        } else {
+          toast.error('Speech recognition error: ' + e.error);
+          setRecordingState('idle');
+        }
+      };
+
+      recognition.onend = () => {
+        // Auto-restart to keep recording through natural pauses
+        // unless the user explicitly stopped or we've hit the restart limit
+        if (!isStoppingRef.current && restartCountRef.current < MAX_RESTARTS) {
+          restartCountRef.current += 1;
+          try { startSession(); } catch { /* ignore */ }
+        } else if (restartCountRef.current >= MAX_RESTARTS) {
+          setRecordingState('done');
+        }
+      };
+
+      recognition.start();
     };
 
-    recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
-      if (e.error === 'not-allowed') {
-        setPermissionError('Microphone access was denied. Please allow microphone access in your browser settings.');
-      } else if (e.error === 'no-speech') {
-        // ignore — user just paused
-      } else {
-        toast.error('Speech recognition error: ' + e.error);
-      }
-      setRecordingState('idle');
-    };
-
-    recognition.onend = () => {
-      // Auto-finalize when recognition ends
-      if (recordingState === 'recording') {
-        setRecordingState('done');
-      }
-    };
-
-    recognition.start();
+    startSession();
     setRecordingState('recording');
   };
 
   const handleStopRecording = () => {
     recognitionRef.current?.stop();
     setRecordingState('done');
+  };
+
+  // Auto-categorize with AI after recording stops
+  const autoCategorizeThenStop = async () => {
+    isStoppingRef.current = true;
+    recognitionRef.current?.stop();
+    setRecordingState('done');
+    // Use whatever text has been accumulated (finalTextRef may have more than state)
+    const text = (finalTextRef.current || transcribedText).trim();
+    if (!text) return;
+    setTranscribedText(text);
+    setIsCategorizingAI(true);
+    try {
+      const result = await api.post<{ category: string; confidence: string }>(
+        '/api/complaints/categorize/',
+        { text }
+      );
+      if (result.category && result.category !== 'other') {
+        setCategory(result.category);
+        toast.success(`AI suggested category: ${result.category}`, { duration: 3000 });
+      }
+    } catch {
+      // silent — user can pick manually
+    } finally {
+      setIsCategorizingAI(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -138,6 +188,7 @@ export default function VoiceComplaint() {
         text: transcribedText.trim(),
         audio_url: null,
         category,
+        priority,
         anonymous: isAnonymous,
       });
       toast.success('Complaint submitted successfully!');
@@ -181,7 +232,7 @@ export default function VoiceComplaint() {
           <motion.button
             whileHover={{ scale: isDone ? 1 : 1.05 }}
             whileTap={{ scale: isDone ? 1 : 0.95 }}
-            onClick={isRecording ? handleStopRecording : handleStartRecording}
+            onClick={isRecording ? autoCategorizeThenStop : handleStartRecording}
             disabled={isDone || !isSupported}
             className={`relative w-32 h-32 rounded-full flex items-center justify-center transition-all ${
               isRecording
@@ -256,10 +307,15 @@ export default function VoiceComplaint() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
-                <Select value={category} onValueChange={setCategory}>
+                <Label htmlFor="category">
+                  Category
+                  {isCategorizingAI && (
+                    <span className="ml-2 text-xs text-primary animate-pulse">AI suggesting…</span>
+                  )}
+                </Label>
+                <Select value={category} onValueChange={setCategory} disabled={isCategorizingAI}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder={isCategorizingAI ? 'AI is categorizing…' : 'Select category'} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="water">Water</SelectItem>
@@ -268,6 +324,21 @@ export default function VoiceComplaint() {
                     <SelectItem value="noise">Noise</SelectItem>
                     <SelectItem value="cleanliness">Cleanliness</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="priority">Priority</Label>
+                <Select value={priority} onValueChange={setPriority}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">🔽 Low</SelectItem>
+                    <SelectItem value="medium">🔼 Medium</SelectItem>
+                    <SelectItem value="high">⚠️ High</SelectItem>
+                    <SelectItem value="urgent">🔥 Urgent</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

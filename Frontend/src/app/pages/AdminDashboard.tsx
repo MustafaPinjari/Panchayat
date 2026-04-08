@@ -11,6 +11,9 @@ import {
   PieChart,
   Pie,
   Cell,
+  LineChart,
+  Line,
+  Legend,
 } from 'recharts';
 import { TrendingUp, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { api } from '../../services/api';
@@ -71,6 +74,22 @@ function formatDate(iso: string): string {
   return date.toLocaleDateString();
 }
 
+function buildTrendData(complaints: Complaint[]): { day: string; submitted: number; resolved: number }[] {
+  const days: { day: string; submitted: number; resolved: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const dateStr = d.toISOString().slice(0, 10);
+    days.push({
+      day: label,
+      submitted: complaints.filter((c) => c.created_at?.slice(0, 10) === dateStr).length,
+      resolved: complaints.filter((c) => c.status === 'resolved' && c.created_at?.slice(0, 10) === dateStr).length,
+    });
+  }
+  return days;
+}
+
 // ── StatCard ─────────────────────────────────────────────────────────────────
 
 const StatCard = ({
@@ -116,6 +135,7 @@ const ChartSkeleton = () => (
 export default function AdminDashboard() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [allComplaints, setAllComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -124,12 +144,14 @@ export default function AdminDashboard() {
       setLoading(true);
       setError(null);
       try {
-        const [analyticsData, complaintsData] = await Promise.all([
+        const [analyticsData, complaintsData, allData] = await Promise.all([
           api.get<Analytics>('/api/admin/analytics/'),
           api.get<PaginatedResponse<Complaint>>('/api/complaints/?page_size=5'),
+          api.get<PaginatedResponse<Complaint>>('/api/complaints/?page_size=200'),
         ]);
         setAnalytics(analyticsData);
         setComplaints(complaintsData.results);
+        setAllComplaints(allData.results);
       } catch (err: any) {
         setError(err.message ?? 'Failed to load dashboard data');
       } finally {
@@ -153,6 +175,8 @@ export default function AdminDashboard() {
         count: value,
       }))
     : [];
+
+  const trendData = buildTrendData(allComplaints);
 
   return (
     <div className="flex-1 flex flex-col min-h-screen pb-20 md:pb-0">
@@ -250,6 +274,48 @@ export default function AdminDashboard() {
                 </ResponsiveContainer>
               )}
             </div>
+          </div>
+
+          {/* 7-Day Trend */}
+          <div className="bg-card border border-border rounded-xl p-6">
+            <h3 className="font-semibold mb-6">7-Day Complaint Trend</h3>
+            {loading ? (
+              <ChartSkeleton />
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="#64748b" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="#64748b" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="submitted"
+                    stroke="#4F46E5"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Submitted"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="resolved"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                    name="Resolved"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           {/* Recent Activity Table */}

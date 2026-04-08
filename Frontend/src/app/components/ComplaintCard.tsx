@@ -1,7 +1,8 @@
 import React from 'react';
 import { StatusBadge } from './StatusBadge';
 import { CategoryBadge } from './CategoryBadge';
-import { Clock, MessageSquare, User } from 'lucide-react';
+import { PriorityBadge } from './PriorityBadge';
+import { Clock, MessageSquare, User, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface ComplaintCardProps {
@@ -10,6 +11,8 @@ interface ComplaintCardProps {
   category: string;
   status: 'pending' | 'approved' | 'assigned' | 'in-progress' | 'in_progress' | 'resolved' | 'rejected';
   timestamp: string;
+  createdAt?: string; // ISO string for overdue calculation
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
   isAnonymous?: boolean;
   author?: string;
   replies?: number;
@@ -29,6 +32,8 @@ export function ComplaintCard({
   category,
   status,
   timestamp,
+  createdAt,
+  priority,
   isAnonymous = false,
   author,
   replies = 0,
@@ -43,6 +48,13 @@ export function ComplaintCard({
 }: ComplaintCardProps) {
   const showCommitteeActions = userRole === 'committee_member' || userRole === 'admin';
   const showManagerActions = userRole === 'manager';
+
+  // Overdue: active complaint older than 3 days
+  const isOverdue = (() => {
+    if (!createdAt || status === 'resolved' || status === 'rejected') return false;
+    const diffDays = (Date.now() - new Date(createdAt).getTime()) / 86400000;
+    return diffDays > 3;
+  })();
 
   return (
     <motion.div
@@ -74,7 +86,16 @@ export function ComplaintCard({
       </div>
 
       <div className="flex items-center justify-between">
-        <CategoryBadge category={category} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <CategoryBadge category={category} />
+          {priority && priority !== 'medium' && <PriorityBadge priority={priority} />}
+          {isOverdue && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-destructive/10 text-destructive border-destructive/20">
+              <AlertTriangle className="w-3 h-3" />
+              Overdue
+            </span>
+          )}
+        </div>
         {replies > 0 && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <MessageSquare className="w-3.5 h-3.5" />

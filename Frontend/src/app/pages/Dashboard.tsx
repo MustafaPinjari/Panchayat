@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router';
 import { TopNav } from '../components/TopNav';
 import { ComplaintCard } from '../components/ComplaintCard';
 import { FAB } from '../components/FAB';
-import { Mic, RefreshCw, X } from 'lucide-react';
+import { Mic, RefreshCw, X, Wifi } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
+
+const POLL_INTERVAL_MS = 10_000; // 10 seconds
 
 interface Complaint {
   id: string;
@@ -19,6 +21,7 @@ interface Complaint {
   category: string;
   status: 'pending' | 'approved' | 'assigned' | 'in_progress' | 'resolved' | 'rejected';
   created_at: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
   assigned_to?: string | null;
   approved_by?: string | null;
 }
@@ -80,7 +83,7 @@ function AssignModal({
   const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
-    api.get<PaginatedResponse<Manager>>('/api/users/?role=manager')
+    api.get<PaginatedResponse<Manager>>('/api/users/managers/')
       .then((data) => setManagers(data.results ?? []))
       .catch(() => toast.error('Could not load managers'))
       .finally(() => setLoadingManagers(false));
@@ -170,6 +173,8 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [assigningComplaintId, setAssigningComplaintId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isLive, setIsLive] = useState(true);
 
   const isCommitteeOrAdmin = user?.role === 'committee_member' || user?.role === 'admin';
 
@@ -205,6 +210,39 @@ export default function Dashboard() {
       setLoading(false);
     }
   }, [buildPath]);
+
+  // Silent background poll — merges updates without resetting the list
+  const pollComplaints = useCallback(async (tab: string, search: string) => {
+    try {
+      const path = buildPath(tab, search);
+      const data = await api.get<PaginatedResponse<Complaint>>(path);
+      setComplaints((prev) => {
+        const incoming = data.results;
+        // Merge: update existing, prepend new
+        const prevMap = new Map(prev.map((c) => [c.id, c]));
+        const merged = incoming.map((c) => prevMap.has(c.id) ? c : c);
+        // Detect any changes to show live indicator pulse
+        const changed = incoming.some((c) => {
+          const old = prevMap.get(c.id);
+          return !old || old.status !== c.status;
+        });
+        if (changed) setIsLive((v) => { void v; return true; });
+        return merged;
+      });
+      setNextUrl(data.next);
+    } catch {
+      // silent — don't disrupt the user
+    }
+  }, [buildPath]);
+
+  // Start/restart polling when tab or search changes
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => {
+      pollComplaints(activeTab, searchQuery);
+    }, POLL_INTERVAL_MS);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [activeTab, searchQuery, pollComplaints]);
 
   const loadMore = async () => {
     if (!nextUrl) return;
@@ -252,7 +290,17 @@ export default function Dashboard() {
 
       <main className="flex-1 p-4 md:p-6 max-w-4xl mx-auto w-full">
         <div className="mb-6">
-          <h2 className="text-2xl font-semibold mb-2">Welcome Back!</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-2xl font-semibold">Welcome Back!</h2>
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+              <Wifi className="w-3 h-3" />
+              Live
+            </span>
+          </div>
           <p className="text-muted-foreground">
             Stay updated with your society's latest complaints and announcements
           </p>
@@ -303,6 +351,8 @@ export default function Dashboard() {
                   category={complaint.category}
                   status={complaint.status}
                   timestamp={formatTimestamp(complaint.created_at)}
+                  createdAt={complaint.created_at}
+                  priority={complaint.priority}
                   isAnonymous={complaint.anonymous}
                   author={complaint.created_by}
                   userRole={user?.role}

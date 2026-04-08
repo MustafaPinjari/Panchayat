@@ -177,7 +177,31 @@ class UserListView(APIView):
         return paginator.get_paginated_response(page)
 
 
+class ManagerListView(APIView):
+    """GET /api/users/managers/ — list all users with role=manager. Committee or Admin."""
+
+    permission_classes = [IsCommitteeOrAdmin]
+
+    def get(self, request):
+        try:
+            managers = firestore_service.query(
+                'users', filters=[('role', '==', 'manager')]
+            )
+        except Exception as exc:
+            logger.error('Firestore query failed in ManagerListView: %s', exc)
+            return Response(
+                {'error': 'Could not retrieve managers.', 'detail': str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        safe = [{k: v for k, v in m.items() if k != 'password_hash'} for m in managers]
+        paginator = _UserPagination()
+        page = paginator.paginate_queryset(safe, request)
+        return paginator.get_paginated_response(page)
+
+
 class UserDetailView(APIView):
+    """GET / PUT / DELETE /api/users/{id}/ — Admin only."""
 
     permission_classes = [IsAdmin]
 

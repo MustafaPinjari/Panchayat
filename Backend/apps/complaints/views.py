@@ -8,6 +8,7 @@ Complaint views:
   AnalyticsView            GET       /api/admin/analytics/
 """
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 
@@ -101,6 +102,7 @@ class ComplaintListCreateView(APIView):
             'anonymous': serializer.validated_data.get('anonymous', False),
             'category': serializer.validated_data['category'],
             'status': 'pending',
+            'priority': serializer.validated_data.get('priority', 'medium'),
             'created_at': _now_iso(),
             'assigned_to': None,
             'approved_by': None,
@@ -518,3 +520,60 @@ class AnalyticsView(APIView):
             {'total': total, 'by_status': by_status, 'by_category': by_category},
             status=status.HTTP_200_OK,
         )
+
+
+class CategorizationView(APIView):
+    """
+    POST /api/complaints/categorize/
+    Body: { "text": "..." }
+    Returns: { "category": "water" | "security" | "maintenance" | "noise" | "cleanliness" | "other",
+               "confidence": "high" | "medium" | "low" }
+    Uses OpenAI GPT to suggest a category for the complaint text.
+    Falls back gracefully if OpenAI is unavailable.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    CATEGORIES = ['water', 'security', 'maintenance', 'noise', 'cleanliness', 'other']
+
+    def post(self, request):
+        text = (request.data.get('text') or '').strip()
+        if not text:
+            return Response(
+                {'error': 'text is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        api_key = os.environ.get('OPENAI_API_KEY', '')
+        if not api_key:
+            return Response(
+                {'category': 'other', 'confidence': 'low'},
+                status=status.HTTP_200_OK,
+            )
+
+        try:
+            import openai
+            client = openai.OpenAI(api_key=api_key)
+            prompt = (
+                f"Classify this housing society complaint into exactly one category.\n"
+                f"Categories: water, security, maintenance, noise, cleanliness, other\n"
+                f"Complaint: \"{text[:500]}\"\n"
+                f"Reply with JSON only: {{\"category\": \"<category>\", \"confidence\": \"high\"|\"medium\"|\"low\"}}"
+            )
+            response = client.chat.completions.create(
+                model='gpt-3.5-turbo',
+                messages=[{'role': 'user', 'content': prompt}],
+                max_tokens=50,
+                temperature=0,
+            )
+            import json
+            raw = response.choices[0].message.content.strip()
+            result = json.loads(raw)
+            category = result.get('category', 'other').lower()
+            if category not in self.CATEGORIES:
+                category = 'other'
+            confidence = result.get('confidence', 'medium')
+            return Response({'category': category, 'confidence': confidence}, status=status.HTTP_200_OK)
+        except Exception as exc:
+            logger.warning('AI categorization failed, returning fallback: %s', exc)
+            return Response({'category': 'other', 'confidence': 'low'}, status=status.HTTP_200_OK)

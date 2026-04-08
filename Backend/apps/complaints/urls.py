@@ -2,6 +2,7 @@ from django.urls import path
 
 from apps.complaints.views import (
     AnalyticsView,
+    CategorizationView,
     CommentCreateView,
     CommentListView,
     ComplaintAssignView,
@@ -13,6 +14,7 @@ from apps.complaints.views import (
 complaint_urlpatterns = [
     # Mounted under api/complaints/ in config/urls.py
     path('', ComplaintListCreateView.as_view(), name='complaint-list-create'),
+    path('categorize/', CategorizationView.as_view(), name='complaint-categorize'),
     path('<str:id>/', ComplaintDetailView.as_view(), name='complaint-detail'),
     path('<str:id>/status/', ComplaintStatusView.as_view(), name='complaint-status'),
     path('<str:id>/assign/', ComplaintAssignView.as_view(), name='complaint-assign'),
