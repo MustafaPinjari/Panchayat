@@ -7,7 +7,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/users/', include('apps.users.urls')),
     path('api/complaints/', include('apps.complaints.urls')),
-    path('api/complaints/', include('apps.audio_processing.urls')),
+    path('api/audio/', include('apps.audio_processing.urls')),
     path('api/notifications/', include('apps.notifications.urls')),
     path('api/', include('apps.roles_permissions.urls')),
     # Comments — wired from apps/complaints/urls.py

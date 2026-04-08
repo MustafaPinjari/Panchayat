@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TopNav } from '../components/TopNav';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -12,13 +12,9 @@ import {
   User,
   UserCog,
   Loader2,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,6 +73,47 @@ const getRoleBadge = (role: string) => {
 };
 
 const ROLE_OPTIONS = ['resident', 'committee_member', 'admin'];
+
+function UserActionsMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <Button variant="ghost" size="icon" onClick={() => setOpen((o) => !o)}>
+        <MoreVertical className="w-4 h-4" />
+      </Button>
+      {open && (
+        <div className="absolute right-0 top-9 z-50 w-44 bg-popover border border-border rounded-xl shadow-xl overflow-hidden">
+          <div className="p-1">
+            <button
+              className="w-full text-left px-3 py-2.5 text-sm rounded-lg flex items-center gap-2.5 hover:bg-muted transition-colors"
+              onClick={() => { onEdit(); setOpen(false); }}
+            >
+              <Pencil className="w-4 h-4 text-muted-foreground" />
+              Edit User
+            </button>
+            <button
+              className="w-full text-left px-3 py-2.5 text-sm rounded-lg flex items-center gap-2.5 hover:bg-destructive/10 text-destructive transition-colors"
+              onClick={() => { onDelete(); setOpen(false); }}
+            >
+              <Trash2 className="w-4 h-4" />
+              Remove User
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -277,19 +314,10 @@ export default function UserManagement() {
                               {new Date(user.created_at).toLocaleDateString()}
                             </td>
                             <td className="p-4">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <MoreVertical className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openEdit(user)}>Edit User</DropdownMenuItem>
-                                  <DropdownMenuItem className="text-destructive" onClick={() => openDelete(user)}>
-                                    Remove User
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              <UserActionsMenu
+                                onEdit={() => openEdit(user)}
+                                onDelete={() => openDelete(user)}
+                              />
                             </td>
                           </tr>
                         );
@@ -310,19 +338,10 @@ export default function UserManagement() {
                           <h3 className="font-medium mb-1">{user.name}</h3>
                           <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEdit(user)}>Edit User</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => openDelete(user)}>
-                              Remove User
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <UserActionsMenu
+                          onEdit={() => openEdit(user)}
+                          onDelete={() => openDelete(user)}
+                        />
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Badge variant="outline" className={getRoleBadge(user.role)}>

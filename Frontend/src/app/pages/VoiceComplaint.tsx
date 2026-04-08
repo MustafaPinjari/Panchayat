@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { TopNav } from '../components/TopNav';
 import { Button } from '../components/ui/button';
@@ -17,125 +17,109 @@ import {
 import { toast } from 'sonner';
 import { api } from '../../services/api';
 
-type RecordingState = 'idle' | 'recording' | 'uploading' | 'done';
+// Web Speech API types
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionInstance;
+    webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
+  }
+}
+
+type RecordingState = 'idle' | 'recording' | 'done';
 
 export default function VoiceComplaint() {
   const navigate = useNavigate();
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [transcribedText, setTranscribedText] = useState('');
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [category, setCategory] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [isSupported, setIsSupported] = useState(true);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const interimRef = useRef<string>('');
+
+  useEffect(() => {
+    const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!SR) setIsSupported(false);
+  }, []);
 
   const isRecording = recordingState === 'recording';
-  const isUploading = recordingState === 'uploading';
   const isDone = recordingState === 'done';
 
-  const handleStartRecording = async () => {
+  const handleStartRecording = () => {
     setPermissionError(null);
-    chunksRef.current = [];
-
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (err) {
-      const error = err as Error;
-      if (
-        error.name === 'NotAllowedError' ||
-        error.name === 'PermissionDeniedError'
-      ) {
-        setPermissionError(
-          'Microphone access was denied. Please allow microphone access in your browser settings and try again.'
-        );
-      } else if (error.name === 'NotFoundError') {
-        setPermissionError(
-          'No microphone found. Please connect a microphone and try again.'
-        );
-      } else {
-        setPermissionError(
-          'Could not access microphone. Please check your device settings.'
-        );
-      }
+    const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!SR) {
+      setPermissionError('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
       return;
     }
 
-    streamRef.current = stream;
+    const recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognitionRef.current = recognition;
+    interimRef.current = '';
 
-    // Pick a supported MIME type
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : MediaRecorder.isTypeSupported('audio/webm')
-      ? 'audio/webm'
-      : MediaRecorder.isTypeSupported('audio/mp4')
-      ? 'audio/mp4'
-      : '';
+    recognition.onresult = (e: SpeechRecognitionEvent) => {
+      let final = '';
+      let interim = '';
+      for (let i = 0; i < e.results.length; i++) {
+        const result = e.results[i];
+        if (result.isFinal) {
+          final += result[0].transcript + ' ';
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+      setTranscribedText(final + interim);
+      interimRef.current = interim;
+    };
 
-    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-    mediaRecorderRef.current = recorder;
+    recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (e.error === 'not-allowed') {
+        setPermissionError('Microphone access was denied. Please allow microphone access in your browser settings.');
+      } else if (e.error === 'no-speech') {
+        // ignore — user just paused
+      } else {
+        toast.error('Speech recognition error: ' + e.error);
+      }
+      setRecordingState('idle');
+    };
 
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        chunksRef.current.push(e.data);
+    recognition.onend = () => {
+      // Auto-finalize when recognition ends
+      if (recordingState === 'recording') {
+        setRecordingState('done');
       }
     };
 
-    recorder.onstop = async () => {
-      // Stop all tracks to release the mic
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-
-      const blob = new Blob(chunksRef.current, {
-        type: mimeType || 'audio/webm',
-      });
-
-      await uploadAudio(blob, mimeType || 'audio/webm');
-    };
-
-    recorder.start();
+    recognition.start();
     setRecordingState('recording');
   };
 
   const handleStopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    setRecordingState('uploading');
-  };
-
-  const uploadAudio = async (blob: Blob, mimeType: string) => {
-    const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
-    const formData = new FormData();
-    formData.append('audio_file', blob, `recording.${extension}`);
-
-    try {
-      const result = await api.upload<{ audio_url: string; transcript: string }>(
-        '/api/complaints/audio-upload/',
-        formData
-      );
-      setAudioUrl(result.audio_url);
-      setTranscribedText(result.transcript);
-      setRecordingState('done');
-    } catch (err) {
-      const error = err as Error;
-      const msg = error.message ?? '';
-
-      if (msg.includes('502') || msg.toLowerCase().includes('whisper')) {
-        toast.error('Transcription service is temporarily unavailable. Please try again later.');
-      } else if (msg.includes('400') && msg.toLowerCase().includes('large')) {
-        toast.error('Recording is too large. Please keep recordings under the size limit.');
-      } else if (msg.includes('400')) {
-        toast.error('Unsupported audio format. Please try recording again.');
-      } else {
-        toast.error('Failed to upload recording. Please try again.');
-      }
-
-      // Reset so user can try again
-      setRecordingState('idle');
-    }
+    recognitionRef.current?.stop();
+    setRecordingState('done');
   };
 
   const handleSubmit = async () => {
@@ -151,8 +135,8 @@ export default function VoiceComplaint() {
     setIsSubmitting(true);
     try {
       await api.post('/api/complaints/', {
-        text: transcribedText,
-        audio_url: audioUrl,
+        text: transcribedText.trim(),
+        audio_url: null,
         category,
         anonymous: isAnonymous,
       });
@@ -178,6 +162,13 @@ export default function VoiceComplaint() {
           </p>
         </div>
 
+        {/* Browser support warning */}
+        {!isSupported && (
+          <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm">
+            Speech recognition is not supported in this browser. Please use Chrome or Edge.
+          </div>
+        )}
+
         {/* Permission error */}
         {permissionError && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive text-sm">
@@ -188,23 +179,19 @@ export default function VoiceComplaint() {
         {/* Recording Button */}
         <div className="flex flex-col items-center justify-center mb-8">
           <motion.button
-            whileHover={{ scale: isUploading || isDone ? 1 : 1.05 }}
-            whileTap={{ scale: isUploading || isDone ? 1 : 0.95 }}
+            whileHover={{ scale: isDone ? 1 : 1.05 }}
+            whileTap={{ scale: isDone ? 1 : 0.95 }}
             onClick={isRecording ? handleStopRecording : handleStartRecording}
-            disabled={isUploading || isDone}
+            disabled={isDone || !isSupported}
             className={`relative w-32 h-32 rounded-full flex items-center justify-center transition-all ${
               isRecording
                 ? 'bg-destructive text-destructive-foreground shadow-lg shadow-destructive/50'
                 : isDone
                 ? 'bg-accent text-accent-foreground'
-                : isUploading
-                ? 'bg-muted text-muted-foreground'
                 : 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
-            } ${isUploading || isDone ? 'cursor-not-allowed opacity-50' : ''}`}
+            } ${isDone || !isSupported ? 'cursor-not-allowed opacity-50' : ''}`}
           >
-            {isUploading ? (
-              <Loader2 className="w-12 h-12 animate-spin" />
-            ) : isRecording ? (
+            {isRecording ? (
               <Square className="w-12 h-12" />
             ) : (
               <Mic className="w-12 h-12" />
@@ -234,20 +221,17 @@ export default function VoiceComplaint() {
 
           <p className="mt-4 text-sm text-muted-foreground">
             {isRecording
-              ? 'Recording… Tap to stop'
-              : isUploading
-              ? 'Uploading & transcribing…'
+              ? 'Listening… Tap to stop'
               : isDone
               ? 'Recording complete'
               : 'Tap to start recording'}
           </p>
 
-          {/* Upload/transcription progress indicator */}
-          {isUploading && (
-            <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Processing your audio with Whisper…</span>
-            </div>
+          {/* Live transcript preview while recording */}
+          {isRecording && transcribedText && (
+            <p className="mt-3 text-sm text-center text-muted-foreground italic max-w-sm">
+              "{transcribedText}"
+            </p>
           )}
         </div>
 

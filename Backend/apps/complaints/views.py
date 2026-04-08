@@ -274,7 +274,6 @@ class CommentListView(APIView):
             comments = firestore_service.query(
                 'comments',
                 filters=[('complaint_id', '==', complaint_id)],
-                order_by='created_at',
             )
         except Exception as exc:
             logger.error('Firestore query failed in CommentListView: %s', exc)
@@ -282,6 +281,8 @@ class CommentListView(APIView):
                 {'error': 'Could not retrieve comments.', 'detail': str(exc)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        comments = sorted(comments, key=lambda c: c.get('created_at', ''))
 
         serializer = CommentSerializer(comments, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

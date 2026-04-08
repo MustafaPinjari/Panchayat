@@ -11,14 +11,16 @@ export function Layout() {
   const location = useLocation();
   const { isAuthenticated } = useAuth();
 
+  const isPublicPage = location.pathname === '/' || location.pathname === '/login';
+
   useEffect(() => {
-    if (!isAuthenticated && location.pathname !== '/') {
+    if (!isAuthenticated && !isPublicPage) {
       navigate('/');
     }
-  }, [isAuthenticated, navigate, location.pathname]);
+  }, [isAuthenticated, navigate, isPublicPage]);
 
-  // Don't show sidebar/bottom nav on login page
-  if (location.pathname === '/') {
+  // Don't show sidebar/bottom nav on public pages
+  if (isPublicPage) {
     return (
       <>
         <Outlet />

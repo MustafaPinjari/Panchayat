@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { TopNav } from '../components/TopNav';
 import { Button } from '../components/ui/button';
@@ -11,18 +11,11 @@ import {
   User,
   Send,
   MoreVertical,
-  CheckCircle,
 } from 'lucide-react';
-import { motion } from 'motion/react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { motion } from 'motion/react';
 
 interface Complaint {
   id: string;
@@ -64,6 +57,78 @@ function ComplaintSkeleton() {
       <SkeletonBlock className="h-7 w-3/4" />
       <SkeletonBlock className="h-4 w-48" />
       <SkeletonBlock className="h-20 w-full mt-4" />
+    </div>
+  );
+}
+
+const STATUS_ITEMS = [
+  {
+    value: 'pending',
+    label: 'Mark as Pending',
+    icon: '🕐',
+    className: 'text-yellow-600 dark:text-yellow-400',
+  },
+  {
+    value: 'in_progress',
+    label: 'Mark as In Progress',
+    icon: '⚙️',
+    className: 'text-blue-600 dark:text-blue-400',
+  },
+  {
+    value: 'resolved',
+    label: 'Mark as Resolved',
+    icon: '✅',
+    className: 'text-green-600 dark:text-green-400',
+  },
+];
+
+function StatusDropdown({ onSelect, disabled }: { onSelect: (s: string) => void; disabled: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <Button
+        variant="ghost"
+        size="icon"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className="text-muted-foreground hover:text-foreground"
+      >
+        <MoreVertical className="w-4 h-4" />
+      </Button>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: -4 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.1 }}
+          className="absolute right-0 top-10 z-50 w-52 bg-popover border border-border rounded-xl shadow-xl overflow-hidden"
+        >
+          <p className="px-3 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Update Status
+          </p>
+          <div className="p-1">
+            {STATUS_ITEMS.map((item) => (
+              <button
+                key={item.value}
+                className={`w-full text-left px-3 py-2.5 text-sm rounded-lg flex items-center gap-3 transition-colors hover:bg-muted ${item.className}`}
+                onClick={() => { onSelect(item.value); setOpen(false); }}
+              >
+                <span className="text-base leading-none">{item.icon}</span>
+                <span className="font-medium">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -158,7 +223,7 @@ export default function ComplaintDetail() {
     <div className="flex-1 flex flex-col min-h-screen pb-20 md:pb-0">
       <TopNav title="Complaint Details" />
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1">
         <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
           {/* Back Button */}
           <Button
@@ -211,35 +276,10 @@ export default function ComplaintDetail() {
                 </div>
 
                 {canChangeStatus && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={updatingStatus}
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleStatusChange('pending')}
-                      >
-                        Mark as Pending
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleStatusChange('in_progress')}
-                      >
-                        Mark as In Progress
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleStatusChange('resolved')}
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2 text-accent" />
-                        Mark as Resolved
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <StatusDropdown
+                    onSelect={handleStatusChange}
+                    disabled={updatingStatus}
+                  />
                 )}
               </div>
 

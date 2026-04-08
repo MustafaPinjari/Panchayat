@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
+import RoleSelect from './pages/RoleSelect';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import VoiceComplaint from './pages/VoiceComplaint';
@@ -18,6 +19,10 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
+        Component: RoleSelect,
+      },
+      {
+        path: 'login',
         Component: Login,
       },
       {

@@ -48,14 +48,21 @@ def _issue_tokens_for_user(user_data: dict) -> dict:
         is_active = True
 
     refresh = RT.for_user(_FirestoreUser())
-    # Embed custom claims
+    # Embed custom claims on both tokens
     refresh['user_id'] = user_data['id']
     refresh['email'] = user_data.get('email', '')
     refresh['role'] = user_data.get('role', 'resident')
+    refresh['name'] = user_data.get('name', '')
+
+    access = refresh.access_token
+    access['user_id'] = user_data['id']
+    access['email'] = user_data.get('email', '')
+    access['role'] = user_data.get('role', 'resident')
+    access['name'] = user_data.get('name', '')
 
     return {
         'refresh': str(refresh),
-        'access': str(refresh.access_token),
+        'access': str(access),
     }
 
 

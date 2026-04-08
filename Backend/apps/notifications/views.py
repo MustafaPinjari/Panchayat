@@ -27,7 +27,6 @@ class NotificationListView(APIView):
             notifications = firestore_service.query(
                 'notifications',
                 filters=[('user_id', '==', user_id)],
-                order_by='created_at',
             )
         except Exception as exc:
             logger.error('Firestore query failed in NotificationListView: %s', exc)

@@ -281,4 +281,4 @@ Full reference with request/response shapes: [`Backend/docs/API.md`](Backend/doc
 
 
 "email": "resident@example.com",
-    "password": "SecurePass123",
+"password": "SecurePass123",
