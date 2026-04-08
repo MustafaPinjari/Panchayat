@@ -18,13 +18,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenRefreshView  # re-export
 
-from apps.roles_permissions.permissions import IsAdmin
+from apps.roles_permissions.permissions import IsAdmin, IsCommitteeOrAdmin
 from apps.users.serializers import UserSerializer
 from services.firebase_service import firestore_service
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['RegisterView', 'LoginView', 'TokenRefreshView', 'UserListView', 'UserDetailView']
+__all__ = ['RegisterView', 'LoginView', 'TokenRefreshView', 'UserListView', 'UserDetailView', 'ManagerListView']
 
 
 def _issue_tokens_for_user(user_data: dict) -> dict:
@@ -178,7 +178,6 @@ class UserListView(APIView):
 
 
 class UserDetailView(APIView):
-    """GET / PUT / DELETE /api/users/{id}/ — Admin only."""
 
     permission_classes = [IsAdmin]
 

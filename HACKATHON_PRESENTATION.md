@@ -517,22 +517,22 @@ OPENAI WHISPER (Audio Transcription Service)
 
 ```
 ADMIN ACCOUNT:
-  Email: admin@samadhan.com
+  Email: admin@societyhub.com
   Password: Admin@123
   Access: Full system, analytics, user management
 
 COMMITTEE MEMBER:
-  Email: committee@samadhan.com
+  Email: committee@societyhub.com
   Password: Committee@123
   Access: Approve/reject complaints, assign managers
 
 PROPERTY MANAGER:
-  Email: manager@samadhan.com
+  Email: manager@societyhub.com
   Password: Manager@123
   Access: Assigned tasks only, status updates
 
 RESIDENT:
-  Email: resident@samadhan.com
+  Email: resident@societyhub.com
   Password: Resident@123
   Access: Submit complaints, view own, notifications
 ```
